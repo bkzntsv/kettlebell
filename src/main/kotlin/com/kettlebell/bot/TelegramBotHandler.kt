@@ -319,7 +319,10 @@ class TelegramBotHandler(
         val currentState = fsmManager.getCurrentState(userId)
         
         if (currentState != UserState.IDLE) {
-            sendMessage(chatId, "Сейчас ты находишься в процессе. Заверши текущее действие перед созданием новой тренировки.")
+            val keyboard = InlineKeyboardMarkup(listOf(
+                listOf(InlineKeyboardButton("Отменить текущее действие", "cancel_action"))
+            ))
+            sendMessage(chatId, "Сейчас ты находишься в процессе. Заверши текущее действие перед созданием новой тренировки.", keyboard)
         } else {
             try {
                 sendMessage(chatId, "Генерирую тренировку... Подождите немного.")
@@ -438,11 +441,17 @@ class TelegramBotHandler(
             
             val volume = workoutService.calculateTotalVolume(workout)
             
+            val warning = if (volume == 0) {
+                "\n\n⚠️ Внимание: общий объем равен 0. Возможно, я не смог распознать упражнения в твоем отзыве. Проверь историю и при необходимости напиши мне снова."
+            } else {
+                ""
+            }
+            
             sendMessage(chatId, """
                 Тренировка завершена! 🎉
                 
                 Общий объем: $volume кг
-                RPE: ${workout.actualPerformance?.rpe ?: "-"}
+                RPE: ${workout.actualPerformance?.rpe ?: "-"}$warning
                 
                 Отдыхай!
             """.trimIndent())
@@ -765,6 +774,10 @@ class TelegramBotHandler(
                 "edit_goal" -> {
                     fsmManager.transitionTo(userId, UserState.EDIT_GOAL)
                     sendMessage(chatId, "Напиши свою новую цель тренировок.")
+                }
+                "cancel_action" -> {
+                    fsmManager.transitionTo(userId, UserState.IDLE)
+                    sendMessage(chatId, "Действие отменено. Теперь ты можешь начать новую тренировку с /workout.")
                 }
             }
         } catch (e: Exception) {

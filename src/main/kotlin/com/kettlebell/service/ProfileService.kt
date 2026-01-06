@@ -7,6 +7,7 @@ import com.kettlebell.model.Gender
 
 interface ProfileService {
     suspend fun createProfile(userId: Long, profileData: ProfileData): UserProfile
+    suspend fun initProfile(userId: Long): UserProfile
     suspend fun getProfile(userId: Long): UserProfile?
     suspend fun updateEquipment(userId: Long, weights: List<Int>): UserProfile
     suspend fun updatePersonalData(userId: Long, bodyWeight: Float, gender: Gender): UserProfile

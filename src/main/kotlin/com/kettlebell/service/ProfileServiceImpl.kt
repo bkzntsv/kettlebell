@@ -20,6 +20,26 @@ class ProfileServiceImpl(
         return userRepository.save(profile)
     }
     
+    override suspend fun initProfile(userId: Long): UserProfile {
+        val initialProfileData = ProfileData(
+            weights = emptyList(),
+            experience = ExperienceLevel.BEGINNER,
+            bodyWeight = 0f,
+            gender = Gender.OTHER,
+            goal = ""
+        )
+        
+        val profile = UserProfile(
+            id = userId,
+            fsmState = UserState.IDLE,
+            profile = initialProfileData,
+            subscription = Subscription(SubscriptionType.FREE, null),
+            metadata = UserMetadata(Instant.now(), Instant.now()),
+            schemaVersion = 1
+        )
+        return userRepository.save(profile)
+    }
+    
     override suspend fun getProfile(userId: Long): UserProfile? {
         return userRepository.findById(userId)
     }

@@ -1,10 +1,13 @@
 package com.kettlebell.bot
 
+import com.kettlebell.model.ExperienceLevel
+import com.kettlebell.model.Gender
 import com.kettlebell.config.AppConfig
 import com.kettlebell.model.UserState
 import com.kettlebell.service.FSMManager
 import com.kettlebell.service.ProfileService
 import com.kettlebell.service.WorkoutService
+import com.kettlebell.service.AIService
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -64,17 +67,51 @@ data class TelegramCallbackQuery(
     val data: String? = null
 )
 
+@Serializable
+data class InlineKeyboardMarkup(
+    val inline_keyboard: List<List<InlineKeyboardButton>>
+)
+
+@Serializable
+data class InlineKeyboardButton(
+    val text: String,
+    val callback_data: String
+)
+
+@Serializable
+data class GetFileResponse(
+    val result: TelegramFile
+)
+
+@Serializable
+data class TelegramFile(
+    val file_id: String,
+    val file_path: String? = null
+)
+
+@Serializable
+data class SendMessageRequest(
+    val chat_id: Long,
+    val text: String,
+    val reply_markup: InlineKeyboardMarkup? = null
+)
+
 class TelegramBotHandler(
     private val config: AppConfig,
     private val fsmManager: FSMManager,
     private val profileService: ProfileService,
-    private val workoutService: WorkoutService
+    private val workoutService: WorkoutService,
+    private val aiService: AIService
 ) {
     private val logger = LoggerFactory.getLogger(TelegramBotHandler::class.java)
     private val scope = CoroutineScope(Dispatchers.Default)
     private val httpClient = HttpClient(CIO)
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json { 
+        ignoreUnknownKeys = true 
+        encodeDefaults = false 
+    }
     private val telegramApiUrl = "https://api.telegram.org/bot${config.telegramBotToken}"
+    private val telegramFileUrl = "https://api.telegram.org/file/bot${config.telegramBotToken}"
     
     suspend fun handleUpdate(update: TelegramUpdate) {
         try {
@@ -111,45 +148,60 @@ class TelegramBotHandler(
     private suspend fun handleCommand(userId: Long, chatId: Long, command: String) {
         val parts = command.split(" ", limit = 2)
         val cmd = parts[0].lowercase()
-        val args = parts.getOrNull(1) ?: ""
+        // val args = parts.getOrNull(1) ?: ""
         
-        val responseText = when (cmd) {
-            "/start" -> handleStartCommand(userId)
-            "/help" -> handleHelpCommand()
-            "/profile" -> handleProfileCommand(userId)
-            "/workout" -> handleWorkoutCommand(userId)
-            "/history" -> handleHistoryCommand(userId)
-            else -> "Неизвестная команда. Используйте /help для списка команд."
+        when (cmd) {
+            "/start" -> handleStartCommand(userId, chatId)
+            "/help" -> handleHelpCommand(chatId)
+            "/profile" -> handleProfileCommand(userId, chatId)
+            "/workout" -> handleWorkoutCommand(userId, chatId)
+            "/history" -> handleHistoryCommand(userId, chatId)
+            else -> sendMessage(chatId, "Неизвестная команда. Используйте /help для списка команд.")
         }
-        
-        sendMessage(chatId, responseText)
     }
     
-    private suspend fun handleStartCommand(userId: Long): String {
+    private suspend fun handleStartCommand(userId: Long, chatId: Long) {
         val profile = profileService.getProfile(userId)
         
-        return if (profile == null) {
+        if (profile == null) {
+            profileService.initProfile(userId)
             fsmManager.transitionTo(userId, UserState.ONBOARDING_MEDICAL_CONFIRM)
-            """
+            sendMessage(chatId, """
             Привет! Я бот для тренировок с гирями.
             
             Перед началом работы мне нужно убедиться, что у тебя нет медицинских противопоказаний к тренировкам.
             
             Подтверди, что у тебя нет медицинских противопоказаний к физическим нагрузкам.
-            """.trimIndent()
+            Напиши "Да" или "Подтверждаю".
+            """.trimIndent())
         } else {
-            """
-            С возвращением! 
-            
-            Используй /workout для создания новой тренировки
-            Используй /profile для просмотра и редактирования профиля
-            Используй /history для просмотра истории тренировок
-            """.trimIndent()
+            if (profile.fsmState != UserState.IDLE && profile.fsmState.name.startsWith("ONBOARDING")) {
+                 sendMessage(chatId, resumeOnboarding(userId, profile.fsmState))
+            } else {
+                sendMessage(chatId, """
+                С возвращением! 
+                
+                Используй /workout для создания новой тренировки
+                Используй /profile для просмотра и редактирования профиля
+                Используй /history для просмотра истории тренировок
+                """.trimIndent())
+            }
         }
     }
     
-    private suspend fun handleHelpCommand(): String {
-        return """
+    private suspend fun resumeOnboarding(userId: Long, state: UserState): String {
+        return when (state) {
+            UserState.ONBOARDING_MEDICAL_CONFIRM -> "Подтверди отсутствие медицинских противопоказаний (напиши 'Да')."
+            UserState.ONBOARDING_EQUIPMENT -> "Какие у тебя есть гири? Напиши вес в кг через запятую (например: 16, 24)."
+            UserState.ONBOARDING_EXPERIENCE -> "Какой у тебя опыт тренировок? (Новичок, Любитель, Про)."
+            UserState.ONBOARDING_PERSONAL_DATA -> "Напиши свой вес (кг) и пол (М/Ж). Например: 80 М"
+            UserState.ONBOARDING_GOALS -> "Какая у тебя цель тренировок? (например: Сила, Выносливость, Похудение)"
+            else -> "Продолжаем..."
+        }
+    }
+    
+    private suspend fun handleHelpCommand(chatId: Long) {
+        sendMessage(chatId, """
         Доступные команды:
         
         /start - Начать работу с ботом
@@ -157,16 +209,16 @@ class TelegramBotHandler(
         /profile - Просмотр и редактирование профиля
         /workout - Создать новую тренировку
         /history - Просмотр истории тренировок
-        """.trimIndent()
+        """.trimIndent())
     }
     
-    private suspend fun handleProfileCommand(userId: Long): String {
+    private suspend fun handleProfileCommand(userId: Long, chatId: Long) {
         val profile = profileService.getProfile(userId)
         
-        return if (profile == null) {
-            "Профиль не найден. Используйте /start для начала работы."
+        if (profile == null) {
+            sendMessage(chatId, "Профиль не найден. Используйте /start для начала работы.")
         } else {
-            buildString {
+            val text = buildString {
                 appendLine("📋 Твой профиль:")
                 appendLine()
                 appendLine("Опыт: ${profile.profile.experience.name}")
@@ -175,20 +227,22 @@ class TelegramBotHandler(
                 appendLine("Доступные гири: ${profile.profile.weights.joinToString(", ")} кг")
                 appendLine("Цель: ${profile.profile.goal}")
             }
+            sendMessage(chatId, text)
         }
     }
     
-    private suspend fun handleWorkoutCommand(userId: Long): String {
+    private suspend fun handleWorkoutCommand(userId: Long, chatId: Long) {
         val currentState = fsmManager.getCurrentState(userId)
         
-        return if (currentState != UserState.IDLE) {
-            "Сейчас ты находишься в процессе. Заверши текущее действие перед созданием новой тренировки."
+        if (currentState != UserState.IDLE) {
+            sendMessage(chatId, "Сейчас ты находишься в процессе. Заверши текущее действие перед созданием новой тренировки.")
         } else {
             try {
+                sendMessage(chatId, "Генерирую тренировку... Подождите немного.")
                 fsmManager.transitionTo(userId, UserState.WORKOUT_REQUESTED)
                 val workout = workoutService.generateWorkoutPlan(userId)
                 
-                buildString {
+                val text = buildString {
                     appendLine("💪 План тренировки:")
                     appendLine()
                     appendLine("Разминка:")
@@ -208,24 +262,30 @@ class TelegramBotHandler(
                     appendLine("Заминка:")
                     appendLine(workout.plan.cooldown)
                 }
+                
+                val keyboard = InlineKeyboardMarkup(listOf(
+                    listOf(InlineKeyboardButton("Начать тренировку", "start_workout:${workout.id}"))
+                ))
+                
+                sendMessage(chatId, text, keyboard)
             } catch (e: IllegalStateException) {
                 fsmManager.transitionTo(userId, UserState.IDLE)
-                "Ошибка: ${e.message}"
+                sendMessage(chatId, "Ошибка: ${e.message}")
             } catch (e: Exception) {
                 logger.error("Error generating workout", e)
                 fsmManager.transitionTo(userId, UserState.IDLE)
-                "Произошла ошибка при создании тренировки. Попробуйте позже."
+                sendMessage(chatId, "Произошла ошибка при создании тренировки. Попробуйте позже.")
             }
         }
     }
     
-    private suspend fun handleHistoryCommand(userId: Long): String {
+    private suspend fun handleHistoryCommand(userId: Long, chatId: Long) {
         val workouts = workoutService.getWorkoutHistory(userId, 10)
         
-        return if (workouts.isEmpty()) {
-            "У тебя пока нет завершенных тренировок."
+        if (workouts.isEmpty()) {
+            sendMessage(chatId, "У тебя пока нет завершенных тренировок.")
         } else {
-            buildString {
+            val text = buildString {
                 appendLine("📊 История тренировок:")
                 appendLine()
                 workouts.forEachIndexed { index, workout ->
@@ -242,52 +302,256 @@ class TelegramBotHandler(
                     }
                 }
             }
+            sendMessage(chatId, text)
         }
     }
     
     private suspend fun handleStateMessage(userId: Long, chatId: Long, text: String) {
         val currentState = fsmManager.getCurrentState(userId)
         
-        val responseText = when (currentState) {
-            UserState.ONBOARDING_MEDICAL_CONFIRM -> {
-                // TODO: Implement onboarding handlers (Task 11)
-                "Обработка онбординга будет реализована в следующей задаче."
-            }
+        when (currentState) {
+            UserState.ONBOARDING_MEDICAL_CONFIRM -> sendMessage(chatId, handleOnboardingMedical(userId, text))
+            UserState.ONBOARDING_EQUIPMENT -> sendMessage(chatId, handleOnboardingEquipment(userId, text))
+            UserState.ONBOARDING_EXPERIENCE -> sendMessage(chatId, handleOnboardingExperience(userId, text))
+            UserState.ONBOARDING_PERSONAL_DATA -> sendMessage(chatId, handleOnboardingPersonalData(userId, text))
+            UserState.ONBOARDING_GOALS -> sendMessage(chatId, handleOnboardingGoals(userId, text))
             UserState.WORKOUT_FEEDBACK_PENDING -> {
-                // TODO: Implement feedback handling (Task 12)
-                "Обработка обратной связи будет реализована в следующей задаче."
+                // Find latest workout pending feedback
+                val workouts = workoutService.getWorkoutHistory(userId, 1)
+                // We need to find workout that is either IN_PROGRESS (if just finished) or COMPLETED (if re-processing?)
+                // Actually, finishWorkout should have been called before entering this state.
+                // But workout status in DB? 
+                // Let's assume the last updated workout is the one.
+                val workout = workouts.firstOrNull() 
+                
+                if (workout != null) {
+                    processFeedback(userId, chatId, workout.id, text)
+                } else {
+                    fsmManager.transitionTo(userId, UserState.IDLE)
+                    sendMessage(chatId, "Не найдена активная тренировка для отзыва.")
+                }
             }
             else -> {
-                "Используйте команды для взаимодействия с ботом. /help для списка команд."
+                sendMessage(chatId, "Используйте команды для взаимодействия с ботом. /help для списка команд.")
+            }
+        }
+    }
+    
+    private suspend fun processFeedback(userId: Long, chatId: Long, workoutId: String, feedback: String) {
+        try {
+            sendMessage(chatId, "Анализирую ваш отзыв...")
+            val workout = workoutService.processFeedback(userId, workoutId, feedback)
+            val volume = workoutService.calculateTotalVolume(workout)
+            
+            sendMessage(chatId, """
+                Тренировка завершена! 🎉
+                
+                Общий объем: $volume кг
+                RPE: ${workout.actualPerformance?.rpe ?: "-"}
+                
+                Отдыхай!
+            """.trimIndent())
+        } catch (e: Exception) {
+            logger.error("Error processing feedback", e)
+            sendMessage(chatId, "Ошибка при обработке отзыва: ${e.message}")
+        }
+    }
+
+    private suspend fun handleOnboardingMedical(userId: Long, text: String): String {
+        val positiveAnswers = listOf("да", "yes", "подтверждаю", "confirm", "ок", "ok", "+")
+        if (text.lowercase().trim() in positiveAnswers) {
+            fsmManager.transitionTo(userId, UserState.ONBOARDING_EQUIPMENT)
+            return "Отлично! Теперь расскажи, какие у тебя есть гири. Напиши их веса в кг через запятую (например: 16, 24)."
+        }
+        return "Пожалуйста, подтверди отсутствие медицинских противопоказаний, написав 'Да' или 'Подтверждаю'."
+    }
+
+    private suspend fun handleOnboardingEquipment(userId: Long, text: String): String {
+        val weights = text.split(",", " ", ";")
+            .mapNotNull { it.trim().toIntOrNull() }
+            .filter { it > 0 }
+            .distinct()
+            .sorted()
+        
+        if (weights.isEmpty()) {
+            return "Не удалось распознать веса. Пожалуйста, введи положительные числа через запятую (например: 16, 24)."
+        }
+        
+        try {
+            profileService.updateEquipment(userId, weights)
+            fsmManager.transitionTo(userId, UserState.ONBOARDING_EXPERIENCE)
+            return "Принято: ${weights.joinToString(", ")} кг.\n\nТеперь укажи свой опыт тренировок с гирями:\n- Новичок (Beginner)\n- Любитель (Amateur)\n- Профи (Pro)"
+        } catch (e: Exception) {
+            logger.error("Error updating equipment", e)
+            return "Произошла ошибка при сохранении данных. Попробуй еще раз."
+        }
+    }
+
+    private suspend fun handleOnboardingExperience(userId: Long, text: String): String {
+        val input = text.lowercase().trim()
+        val experience = when {
+            "новичок" in input || "beginner" in input -> ExperienceLevel.BEGINNER
+            "любитель" in input || "amateur" in input -> ExperienceLevel.AMATEUR
+            "про" in input || "pro" in input -> ExperienceLevel.PRO
+            else -> null
+        }
+        
+        if (experience == null) {
+            return "Пожалуйста, выбери один из вариантов: Новичок, Любитель, Профи."
+        }
+        
+        try {
+            profileService.updateExperience(userId, experience)
+            fsmManager.transitionTo(userId, UserState.ONBOARDING_PERSONAL_DATA)
+            return "Опыт: ${experience.name}.\n\nТеперь напиши свой вес (в кг) и пол (М/Ж).\nНапример: 80 М"
+        } catch (e: Exception) {
+            logger.error("Error updating experience", e)
+            return "Произошла ошибка. Попробуй еще раз."
+        }
+    }
+
+    private suspend fun handleOnboardingPersonalData(userId: Long, text: String): String {
+        // Simple regex to find a number (weight) and a letter (gender)
+        val parts = text.split(" ", ",", ";").map { it.trim() }.filter { it.isNotEmpty() }
+        
+        var bodyWeight: Float? = null
+        var gender: Gender? = null
+        
+        for (part in parts) {
+            if (bodyWeight == null) {
+                val weight = part.replace(",", ".").toFloatOrNull()
+                if (weight != null && weight > 0) {
+                    bodyWeight = weight
+                    continue
+                }
+            }
+            
+            if (gender == null) {
+                val g = part.lowercase()
+                if (g.startsWith("м") || g.startsWith("m")) gender = Gender.MALE
+                else if (g.startsWith("ж") || g.startsWith("f") || g.startsWith("w")) gender = Gender.FEMALE
             }
         }
         
-        sendMessage(chatId, responseText)
+        if (bodyWeight == null) {
+            return "Не удалось распознать вес. Пожалуйста, укажи вес числом (например: 80)."
+        }
+        
+        // Default gender if not parsed
+        val finalGender = gender ?: Gender.MALE 
+        
+        try {
+            profileService.updatePersonalData(userId, bodyWeight, finalGender)
+            fsmManager.transitionTo(userId, UserState.ONBOARDING_GOALS)
+            return "Вес: $bodyWeight кг, Пол: ${finalGender.name}.\n\nПоследний шаг: какая у тебя основная цель тренировок?\n(например: Сила, Выносливость, Похудение, ОФП)"
+        } catch (e: Exception) {
+            logger.error("Error updating personal data", e)
+            return "Произошла ошибка. Попробуй еще раз."
+        }
+    }
+
+    private suspend fun handleOnboardingGoals(userId: Long, text: String): String {
+        if (text.isBlank()) {
+            return "Пожалуйста, напиши свою цель."
+        }
+        
+        try {
+            profileService.updateGoal(userId, text.trim())
+            fsmManager.transitionTo(userId, UserState.IDLE)
+            return """
+            Отлично! Твой профиль создан.
+            
+            Цель: $text
+            
+            Теперь ты можешь создать свою первую тренировку командой /workout.
+            """.trimIndent()
+        } catch (e: Exception) {
+            logger.error("Error updating goal", e)
+            return "Произошла ошибка. Попробуй еще раз."
+        }
     }
     
     private suspend fun handleVoiceMessage(message: TelegramMessage) {
-        // TODO: Implement voice message handling (Task 12)
-        sendMessage(message.chat.id, "Обработка голосовых сообщений будет реализована в следующей задаче.")
+        val userId = message.from.id
+        val chatId = message.chat.id
+        val currentState = fsmManager.getCurrentState(userId)
+        
+        if (currentState == UserState.WORKOUT_FEEDBACK_PENDING) {
+            val fileId = message.voice?.file_id ?: return
+            
+            try {
+                // 1. Get file path
+                val fileResponse = httpClient.get("$telegramApiUrl/getFile?file_id=$fileId")
+                val fileInfo = fileResponse.body<GetFileResponse>()
+                val filePath = fileInfo.result.file_path ?: return
+                
+                // 2. Download file
+                val fileBytes = httpClient.get("$telegramFileUrl/$filePath").body<ByteArray>()
+                
+                // 3. Transcribe
+                sendMessage(chatId, "Обрабатываю голосовое сообщение...")
+                val text = aiService.transcribeVoice(fileBytes)
+                
+                // 4. Process feedback
+                val workouts = workoutService.getWorkoutHistory(userId, 1)
+                val workout = workouts.firstOrNull() // Latest
+                
+                if (workout != null) {
+                    processFeedback(userId, chatId, workout.id, text)
+                } else {
+                    fsmManager.transitionTo(userId, UserState.IDLE)
+                    sendMessage(chatId, "Не найдена активная тренировка для отзыва.")
+                }
+                
+            } catch (e: Exception) {
+                logger.error("Error handling voice message", e)
+                sendMessage(chatId, "Не удалось обработать голосовое сообщение.")
+            }
+        } else {
+            sendMessage(chatId, "Голосовые сообщения принимаются только для отзыва о тренировке.")
+        }
     }
     
     private suspend fun handleCallbackQuery(callbackQuery: TelegramCallbackQuery) {
-        // TODO: Implement callback query handling (Task 12)
         val chatId = callbackQuery.message?.chat?.id ?: return
-        sendMessage(chatId, "Обработка callback запросов будет реализована в следующей задаче.")
+        val userId = callbackQuery.from.id
+        val data = callbackQuery.data ?: return
+        
+        val parts = data.split(":", limit = 2)
+        val action = parts[0]
+        val workoutId = parts.getOrNull(1) ?: return
+        
+        try {
+            when (action) {
+                "start_workout" -> {
+                    workoutService.startWorkout(userId, workoutId)
+                    val keyboard = InlineKeyboardMarkup(listOf(
+                        listOf(InlineKeyboardButton("Завершить тренировку", "finish_workout:$workoutId"))
+                    ))
+                    sendMessage(chatId, "Тренировка начата! Удачи! 💪\nНажми кнопку ниже, когда закончишь.", keyboard)
+                }
+                "finish_workout" -> {
+                    workoutService.finishWorkout(userId, workoutId)
+                    sendMessage(chatId, "Тренировка завершена. Как все прошло? Расскажи о весах, повторениях и ощущениях (текстом или голосом).")
+                }
+            }
+        } catch (e: Exception) {
+            logger.error("Error handling callback: $action", e)
+            sendMessage(chatId, "Ошибка: ${e.message}")
+        }
     }
     
-    private suspend fun sendMessage(chatId: Long, text: String) {
+    private suspend fun sendMessage(chatId: Long, text: String, replyMarkup: InlineKeyboardMarkup? = null) {
         try {
+            val request = SendMessageRequest(chatId, text, replyMarkup)
+            
             val response = httpClient.post("$telegramApiUrl/sendMessage") {
                 contentType(ContentType.Application.Json)
-                setBody(mapOf(
-                    "chat_id" to chatId,
-                    "text" to text
-                ))
+                setBody(json.encodeToString(SendMessageRequest.serializer(), request))
             }
             
             if (!response.status.isSuccess()) {
-                logger.error("Failed to send message: ${response.status}")
+                logger.error("Failed to send message: ${response.status} ${response.bodyAsText()}")
             }
         } catch (e: Exception) {
             logger.error("Error sending message", e)

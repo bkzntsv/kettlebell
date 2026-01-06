@@ -60,7 +60,8 @@ fun appModule(environment: ApplicationEnvironment) = module {
             config = get(),
             fsmManager = get(),
             profileService = get(),
-            workoutService = get()
+            workoutService = get(),
+            aiService = get()
         )
     }
 }

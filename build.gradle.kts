@@ -22,6 +22,9 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
     implementation("io.ktor:ktor-server-cors:2.3.8")
     
+    // Kotlinx Serialization
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+    
     // MongoDB
     implementation("org.litote.kmongo:kmongo:4.11.0")
     implementation("org.litote.kmongo:kmongo-coroutine:4.11.0")

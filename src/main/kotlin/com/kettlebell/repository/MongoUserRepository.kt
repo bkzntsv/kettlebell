@@ -19,7 +19,12 @@ class MongoUserRepository(
     }
     
     override suspend fun save(profile: UserProfile): UserProfile {
-        collection.save(profile)
+        val existing = collection.findOne(UserProfile::id eq profile.id)
+        if (existing != null) {
+            collection.replaceOne(UserProfile::id eq profile.id, profile)
+        } else {
+            collection.insertOne(profile)
+        }
         return profile
     }
     
@@ -35,6 +40,10 @@ class MongoUserRepository(
             UserProfile::id eq userId,
             setValue(UserProfile::subscription, subscription)
         )
+    }
+
+    override suspend fun deleteById(userId: Long) {
+        collection.deleteMany(UserProfile::id eq userId)
     }
 }
 

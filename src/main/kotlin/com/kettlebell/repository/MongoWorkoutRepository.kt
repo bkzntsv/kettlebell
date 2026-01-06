@@ -13,6 +13,7 @@ import org.litote.kmongo.and
 import org.litote.kmongo.setValue
 import org.litote.kmongo.sort
 import org.litote.kmongo.descending
+import com.mongodb.client.model.ReplaceOptions
 import java.time.Instant
 
 class MongoWorkoutRepository(
@@ -22,7 +23,11 @@ class MongoWorkoutRepository(
         database.getCollection<Workout>("workouts")
     
     override suspend fun save(workout: Workout): Workout {
-        collection.save(workout)
+        collection.replaceOne(
+            Workout::id eq workout.id,
+            workout,
+            ReplaceOptions().upsert(true)
+        )
         return workout
     }
     

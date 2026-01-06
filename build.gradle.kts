@@ -73,3 +73,7 @@ application {
     mainClass.set("com.kettlebell.ApplicationKt")
 }
 
+tasks.named<JavaExec>("run") {
+    environment(System.getenv())
+}
+

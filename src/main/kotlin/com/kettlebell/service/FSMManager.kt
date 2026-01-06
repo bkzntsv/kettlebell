@@ -21,7 +21,10 @@ class FSMManager(
             UserState.IDLE -> to in listOf(
                 UserState.ONBOARDING_MEDICAL_CONFIRM,
                 UserState.WORKOUT_REQUESTED,
-                UserState.PROFILE_EDITING
+                UserState.EDIT_EQUIPMENT,
+                UserState.EDIT_EXPERIENCE,
+                UserState.EDIT_PERSONAL_DATA,
+                UserState.EDIT_GOAL
             )
             
             // Onboarding flow
@@ -37,7 +40,10 @@ class FSMManager(
             UserState.WORKOUT_FEEDBACK_PENDING -> to == UserState.IDLE
             
             // Profile flow
-            UserState.PROFILE_EDITING -> to == UserState.IDLE
+            UserState.EDIT_EQUIPMENT -> to == UserState.IDLE
+            UserState.EDIT_EXPERIENCE -> to == UserState.IDLE
+            UserState.EDIT_PERSONAL_DATA -> to == UserState.IDLE
+            UserState.EDIT_GOAL -> to == UserState.IDLE
         }
     }
 }

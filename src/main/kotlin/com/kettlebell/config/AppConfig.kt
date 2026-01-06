@@ -7,7 +7,8 @@ data class AppConfig(
     val openaiApiKey: String,
     val mongodbConnectionUri: String,
     val mongodbDatabaseName: String,
-    val freeMonthlyLimit: Int
+    val freeMonthlyLimit: Int,
+    val botMode: String = "webhook"
 ) {
     companion object {
         fun create(environment: ApplicationEnvironment): AppConfig {
@@ -16,7 +17,8 @@ data class AppConfig(
                 openaiApiKey = environment.config.property("environment.openai.api.key").getString(),
                 mongodbConnectionUri = environment.config.property("environment.mongodb.connection.uri").getString(),
                 mongodbDatabaseName = environment.config.property("environment.mongodb.database.name").getString(),
-                freeMonthlyLimit = environment.config.property("environment.subscription.free.monthly.limit").getString().toInt()
+                freeMonthlyLimit = environment.config.property("environment.subscription.free.monthly.limit").getString().toInt(),
+                botMode = environment.config.propertyOrNull("environment.bot.mode")?.getString() ?: "webhook"
             )
         }
     }

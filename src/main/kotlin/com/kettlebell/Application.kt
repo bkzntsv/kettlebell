@@ -17,9 +17,8 @@ import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import kotlinx.serialization.json.Json
 
-fun main() {
-    embeddedServer(Netty, port = 8080, host = "0.0.0.0", module = Application::module)
-        .start(wait = true)
+fun main(args: Array<String>) {
+    io.ktor.server.netty.EngineMain.main(args)
 }
 
 fun Application.module() {
@@ -33,6 +32,13 @@ fun Application.module() {
     // Inject dependencies using 'by inject()' to avoid conflict with routing 'get'
     val botHandler by inject<TelegramBotHandler>()
     val config by inject<AppConfig>()
+    
+    // Start polling if configured
+    if (config.botMode == "polling") {
+        launch {
+            botHandler.startPolling()
+        }
+    }
     
     routing {
         post("/webhook/{token}") {

@@ -56,6 +56,8 @@ class AIServiceImpl(
             val finishReason = choice.finishReason?.toString()
             val tokensUsed = response.usage?.totalTokens ?: 0
             
+            logger.info("AI Response Content: $content")
+            
             logger.info(
                 "Workout plan generated: tokens=$tokensUsed, finishReason=$finishReason, " +
                 "time=${System.currentTimeMillis() - startTime}ms"
@@ -165,39 +167,42 @@ class AIServiceImpl(
                 }
             }
         
-        return """
-            Create a personalized kettlebell workout plan.
+        return buildString {
+            append("Create a personalized kettlebell workout plan.\n\n")
+            append("Athlete Profile:\n")
+            append("- Experience: ${profile.experience.name}\n")
+            append("- Body Weight: ${profile.bodyWeight}kg\n")
+            append("- Gender: ${profile.gender.name}\n")
+            append("- Goal: ${profile.goal}\n")
+            append("- Available Kettlebells: ${profile.weights.joinToString(", ")}kg\n")
+            append("CRITICAL: Use ONLY the available kettlebell weights listed above. Do not invent other weights.\n\n")
             
-            Athlete Profile:
-            - Experience: ${profile.experience.name}
-            - Body Weight: ${profile.bodyWeight}kg
-            - Gender: ${profile.gender.name}
-            - Goal: ${profile.goal}
-            - Available Kettlebells: ${profile.weights.joinToString(", ")}kg
+            append("Workout History (last ${context.recentWorkouts.size}):\n")
+            append(if (recentWorkoutsInfo.isNotEmpty()) recentWorkoutsInfo else "No completed workouts")
+            append("\n\n")
             
-            Workout History (last ${context.recentWorkouts.size}):
-            ${if (recentWorkoutsInfo.isNotEmpty()) recentWorkoutsInfo else "No completed workouts"}
+            append("Training Week: ${context.trainingWeek}\n\n")
             
-            Training Week: ${context.trainingWeek}
-            
-            Create a plan in JSON format:
-            {
-              "warmup": "warmup description",
-              "exercises": [
-                {
-                  "name": "exercise name",
-                  "weight": weight_in_kg,
-                  "reps": reps_count_or_null,
-                  "sets": sets_count_or_null,
-                  "timeWork": work_time_seconds_or_null,
-                  "timeRest": rest_time_seconds_or_null
-                }
-              ],
-              "cooldown": "cooldown description"
+            if (context.suggestDeload) {
+                append("IMPORTANT: The user has been training with high intensity and stagnating volume recently. Generate a DELOAD workout (lower volume, focus on technique/mobility, RPE 5-6).\n\n")
             }
             
-            Adapt the load based on workout history.
-        """.trimIndent()
+            append("Create a plan in JSON format:\n")
+            append("{\n")
+            append("  \"warmup\": \"warmup description\",\n")
+            append("  \"exercises\": [\n")
+            append("    {\n")
+            append("      \"name\": \"exercise name\",\n")
+            append("      \"weight\": weight_in_kg,\n")
+            append("      \"reps\": reps_count_or_null,\n")
+            append("      \"sets\": sets_count_or_null,\n")
+            append("      \"timeWork\": work_time_seconds_or_null,\n")
+            append("      \"timeRest\": rest_time_seconds_or_null\n")
+            append("    }\n")
+            append("  ],\n")
+            append("  \"cooldown\": \"cooldown description\"\n")
+            append("}")
+        }
     }
     
     private fun buildFeedbackAnalysisPrompt(feedback: String, originalPlan: WorkoutPlan): String {
@@ -242,6 +247,21 @@ class AIServiceImpl(
         """.trimIndent()
     }
     
+    private fun cleanJsonContent(content: String): String {
+        val startIndex = content.indexOf('{')
+        val endIndex = content.lastIndexOf('}')
+        
+        if (startIndex != -1 && endIndex != -1 && endIndex > startIndex) {
+            return content.substring(startIndex, endIndex + 1)
+        }
+        
+        return content.trim()
+            .removePrefix("```json")
+            .removePrefix("```")
+            .removeSuffix("```")
+            .trim()
+    }
+    
     private fun parseWorkoutPlan(
         content: String,
         tokensUsed: Int,
@@ -249,7 +269,8 @@ class AIServiceImpl(
         generationTime: Long
     ): WorkoutPlan {
         try {
-            val jsonObject = json.parseToJsonElement(content).jsonObject
+            val cleanedContent = cleanJsonContent(content)
+            val jsonObject = json.parseToJsonElement(cleanedContent).jsonObject
             val warmup = jsonObject["warmup"]?.jsonPrimitive?.content ?: ""
             val cooldown = jsonObject["cooldown"]?.jsonPrimitive?.content ?: ""
             val exercisesJson = jsonObject["exercises"]?.jsonArray ?: throw IllegalStateException("No exercises in response")
@@ -281,7 +302,8 @@ class AIServiceImpl(
         analysisTime: Long
     ): ActualPerformance {
         try {
-            val jsonObject = json.parseToJsonElement(content).jsonObject
+            val cleanedContent = cleanJsonContent(content)
+            val jsonObject = json.parseToJsonElement(cleanedContent).jsonObject
             val dataJson = jsonObject["data"]?.jsonArray ?: throw IllegalStateException("No data in response")
             
             val data = dataJson.map { value ->
@@ -314,7 +336,10 @@ class AIServiceImpl(
     companion object {
         private const val SYSTEM_PROMPT_WORKOUT_GENERATION = """
             You are an expert kettlebell coach. Create safe and effective workout plans based on the athlete's profile 
-            and training history. Adapt the load based on previous results. Always return valid JSON without additional text.
+            and training history. Adapt the load based on previous results. 
+            ALWAYS reply in RUSSIAN language.
+            Plan MUST contain at least 3 exercises.
+            Always return valid JSON without additional text.
         """
         
         private const val SYSTEM_PROMPT_FEEDBACK_ANALYSIS = """

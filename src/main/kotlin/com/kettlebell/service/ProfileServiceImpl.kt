@@ -21,6 +21,9 @@ class ProfileServiceImpl(
     }
     
     override suspend fun initProfile(userId: Long): UserProfile {
+        // Delete any existing profile to ensure clean state and remove duplicates
+        userRepository.deleteById(userId)
+        
         val initialProfileData = ProfileData(
             weights = emptyList(),
             experience = ExperienceLevel.BEGINNER,

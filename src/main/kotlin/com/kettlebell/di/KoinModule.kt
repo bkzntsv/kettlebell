@@ -19,6 +19,7 @@ import com.kettlebell.service.ProfileServiceImpl
 import com.kettlebell.service.WorkoutService
 import com.kettlebell.service.WorkoutServiceImpl
 import com.kettlebell.bot.TelegramBotHandler
+import com.kettlebell.error.ErrorHandler
 import io.ktor.server.application.*
 import org.koin.dsl.module
 
@@ -55,13 +56,16 @@ fun appModule(environment: ApplicationEnvironment) = module {
         )
     }
     
+    single { ErrorHandler() }
+    
     single {
         TelegramBotHandler(
             config = get(),
             fsmManager = get(),
             profileService = get(),
             workoutService = get(),
-            aiService = get()
+            aiService = get(),
+            errorHandler = get()
         )
     }
 }

@@ -53,7 +53,10 @@ enum class UserState {
     WORKOUT_REQUESTED,
     WORKOUT_IN_PROGRESS,
     WORKOUT_FEEDBACK_PENDING,
-    PROFILE_EDITING
+    EDIT_EQUIPMENT,
+    EDIT_EXPERIENCE,
+    EDIT_PERSONAL_DATA,
+    EDIT_GOAL
 }
 
 // Workout Models
@@ -121,5 +124,6 @@ data class WorkoutContext(
     val profile: UserProfile,
     val recentWorkouts: List<Workout>,
     val availableWeights: List<Int>,
-    val trainingWeek: Int
+    val trainingWeek: Int,
+    val suggestDeload: Boolean = false
 )

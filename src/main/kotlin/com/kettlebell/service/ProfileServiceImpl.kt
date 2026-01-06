@@ -1,0 +1,58 @@
+package com.kettlebell.service
+
+import com.kettlebell.model.*
+import com.kettlebell.repository.UserRepository
+import java.time.Instant
+
+class ProfileServiceImpl(
+    private val userRepository: UserRepository
+) : ProfileService {
+    override suspend fun createProfile(userId: Long, profileData: ProfileData): UserProfile {
+        val profile = UserProfile(
+            id = userId,
+            fsmState = UserState.IDLE,
+            profile = profileData,
+            subscription = Subscription(SubscriptionType.FREE, null),
+            metadata = UserMetadata(Instant.now(), Instant.now()),
+            schemaVersion = 1
+        )
+        return userRepository.save(profile)
+    }
+    
+    override suspend fun getProfile(userId: Long): UserProfile? {
+        return userRepository.findById(userId)
+    }
+    
+    override suspend fun updateEquipment(userId: Long, weights: List<Int>): UserProfile {
+        val profile = userRepository.findById(userId) ?: throw IllegalStateException("Profile not found")
+        val updatedProfile = profile.copy(
+            profile = profile.profile.copy(weights = weights)
+        )
+        return userRepository.save(updatedProfile)
+    }
+    
+    override suspend fun updatePersonalData(userId: Long, bodyWeight: Float, gender: Gender): UserProfile {
+        val profile = userRepository.findById(userId) ?: throw IllegalStateException("Profile not found")
+        val updatedProfile = profile.copy(
+            profile = profile.profile.copy(bodyWeight = bodyWeight, gender = gender)
+        )
+        return userRepository.save(updatedProfile)
+    }
+    
+    override suspend fun updateGoal(userId: Long, goal: String): UserProfile {
+        val profile = userRepository.findById(userId) ?: throw IllegalStateException("Profile not found")
+        val updatedProfile = profile.copy(
+            profile = profile.profile.copy(goal = goal)
+        )
+        return userRepository.save(updatedProfile)
+    }
+    
+    override suspend fun updateExperience(userId: Long, experience: ExperienceLevel): UserProfile {
+        val profile = userRepository.findById(userId) ?: throw IllegalStateException("Profile not found")
+        val updatedProfile = profile.copy(
+            profile = profile.profile.copy(experience = experience)
+        )
+        return userRepository.save(updatedProfile)
+    }
+}
+

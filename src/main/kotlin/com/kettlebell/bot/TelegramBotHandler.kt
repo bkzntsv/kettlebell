@@ -252,7 +252,7 @@ class TelegramBotHandler(
             """.trimIndent())
         } else {
             if (profile.fsmState != UserState.IDLE && profile.fsmState.name.startsWith("ONBOARDING")) {
-                 sendMessage(chatId, resumeOnboarding(userId, profile.fsmState))
+                 sendMessage(chatId, resumeOnboarding(profile.fsmState))
             } else {
                 sendMessage(chatId, """
                 С возвращением! 
@@ -265,7 +265,7 @@ class TelegramBotHandler(
         }
     }
     
-    private suspend fun resumeOnboarding(userId: Long, state: UserState): String {
+    private suspend fun resumeOnboarding(state: UserState): String {
         return when (state) {
             UserState.ONBOARDING_MEDICAL_CONFIRM -> "Подтверди отсутствие медицинских противопоказаний (напиши 'Да')."
             UserState.ONBOARDING_EQUIPMENT -> "Какие у тебя есть гири? Напиши вес в кг через запятую (например: 16, 24)."
@@ -440,6 +440,10 @@ class TelegramBotHandler(
             }
             
             val volume = workoutService.calculateTotalVolume(workout)
+            val performance = workout.actualPerformance
+            
+            // Log what we have for debugging
+            logger.info("Performance data: recoveryStatus=${performance?.recoveryStatus}, technicalNotes=${performance?.technicalNotes?.take(50)}, issues=${performance?.issues}, coachFeedback=${performance?.coachFeedback?.take(50)}")
             
             val warning = if (volume == 0) {
                 "\n\n⚠️ Внимание: общий объем равен 0. Возможно, я не смог распознать упражнения в твоем отзыве. Проверь историю и при необходимости напиши мне снова."
@@ -447,14 +451,47 @@ class TelegramBotHandler(
                 ""
             }
             
-            sendMessage(chatId, """
-                Тренировка завершена! 🎉
+            val message = buildString {
+                appendLine("Тренировка завершена! 🎉")
+                appendLine()
+                appendLine("Общий объем: $volume кг")
+                appendLine("RPE: ${performance?.rpe ?: "-"}")
                 
-                Общий объем: $volume кг
-                RPE: ${workout.actualPerformance?.rpe ?: "-"}$warning
+                // Add recovery status if available
+                performance?.recoveryStatus?.takeIf { it.isNotBlank() }?.let { status ->
+                    appendLine("Статус восстановления: $status")
+                }
                 
-                Отдыхай!
-            """.trimIndent())
+                // Add technical notes if available
+                performance?.technicalNotes?.takeIf { it.isNotBlank() }?.let { notes ->
+                    appendLine()
+                    appendLine("📝 Технические заметки:")
+                    appendLine(notes)
+                }
+                
+                // Add issues/red flags if any
+                performance?.issues?.takeIf { it.isNotEmpty() }?.let { issues ->
+                    appendLine()
+                    appendLine("⚠️ Обрати внимание:")
+                    issues.forEach { issue ->
+                        appendLine("• $issue")
+                    }
+                }
+                
+                // Add coach feedback if available
+                performance?.coachFeedback?.takeIf { it.isNotBlank() }?.let { feedback ->
+                    appendLine()
+                    appendLine("💬 От тренера:")
+                    appendLine(feedback)
+                }
+                
+                append(warning)
+                appendLine()
+                appendLine("Отдыхай!")
+            }
+            
+            logger.info("Sending message to user: ${message.take(200)}")
+            sendMessage(chatId, message.trim())
         } catch (e: AppError) {
             sendMessage(chatId, errorHandler.toUserMessage(e))
         } catch (e: Exception) {

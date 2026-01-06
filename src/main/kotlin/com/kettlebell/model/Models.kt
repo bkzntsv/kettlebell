@@ -78,7 +78,8 @@ enum class WorkoutStatus {
 data class WorkoutPlan(
     val warmup: String,
     val exercises: List<Exercise>,
-    val cooldown: String
+    val cooldown: String,
+    val aiLog: AILog? = null
 )
 
 data class Exercise(
@@ -87,14 +88,19 @@ data class Exercise(
     val reps: Int?,
     val sets: Int?,
     val timeWork: Int?,
-    val timeRest: Int?
+    val timeRest: Int?,
+    val coachingTips: String? = null
 )
 
 data class ActualPerformance(
     val rawFeedback: String,
     val data: List<ExercisePerformance>,
     val rpe: Int?,
-    val issues: List<String> = emptyList()
+    val issues: List<String> = emptyList(), // Maps to red_flags
+    val recoveryStatus: String? = null,
+    val technicalNotes: String? = null,
+    val coachFeedback: String? = null,
+    val aiLog: AILog? = null
 )
 
 data class ExercisePerformance(
@@ -102,7 +108,8 @@ data class ExercisePerformance(
     val weight: Int,
     val reps: Int,
     val sets: Int,
-    val completed: Boolean
+    val completed: Boolean,
+    val status: String? = null // completed, partial, failed
 )
 
 data class WorkoutTiming(

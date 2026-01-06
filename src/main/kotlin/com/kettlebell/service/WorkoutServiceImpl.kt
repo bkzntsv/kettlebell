@@ -1,6 +1,7 @@
 package com.kettlebell.service
 
 import com.kettlebell.config.AppConfig
+import com.kettlebell.error.AppError
 import com.kettlebell.model.*
 import com.kettlebell.repository.UserRepository
 import com.kettlebell.repository.WorkoutRepository
@@ -27,7 +28,7 @@ class WorkoutServiceImpl(
             val startOfMonth = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(30, ChronoUnit.DAYS) // Approximate month
             val count = workoutRepository.countCompletedWorkoutsAfter(userId, startOfMonth)
             if (count >= config.freeMonthlyLimit) {
-                throw IllegalStateException("Free monthly limit exceeded")
+                throw AppError.SubscriptionLimitExceeded
             }
         }
         
@@ -45,6 +46,9 @@ class WorkoutServiceImpl(
         
         val plan = aiService.generateWorkoutPlan(context)
         
+        // Use AI log from plan or default if missing
+        val aiLog = plan.aiLog ?: AILog(0, "gpt-4o", 0, null, null)
+        
         val workout = Workout(
             id = UUID.randomUUID().toString(),
             userId = userId,
@@ -52,7 +56,7 @@ class WorkoutServiceImpl(
             plan = plan,
             actualPerformance = null,
             timing = WorkoutTiming(null, null, null),
-            aiLog = AILog(0, "gpt-4o", 0, null, null),
+            aiLog = aiLog,
             schemaVersion = 1
         )
         
@@ -113,12 +117,26 @@ class WorkoutServiceImpl(
         
         val performance = aiService.analyzeFeedback(feedback, workout.plan)
         
+        // Update AI log with feedback analysis stats
+        val currentAiLog = workout.aiLog
+        val newAiLog = performance.aiLog
+        
+        val updatedAiLog = if (newAiLog != null) {
+            currentAiLog.copy(
+                tokensUsed = currentAiLog.tokensUsed + newAiLog.tokensUsed,
+                feedbackAnalysisTime = newAiLog.feedbackAnalysisTime
+            )
+        } else {
+            currentAiLog
+        }
+        
         val updatedWorkout = workout.copy(
             status = WorkoutStatus.COMPLETED,
             actualPerformance = performance,
             timing = workout.timing.copy(
                 durationSeconds = workout.timing.durationSeconds // Preserve calculated duration
-            )
+            ),
+            aiLog = updatedAiLog
         )
         
         workoutRepository.save(updatedWorkout)
@@ -132,9 +150,34 @@ class WorkoutServiceImpl(
     }
     
     override suspend fun calculateTotalVolume(workout: Workout): Int {
-        return workout.actualPerformance?.data?.sumOf { 
-            if (it.completed) it.weight * it.reps * it.sets else 0
-        } ?: 0
+        val performance = workout.actualPerformance
+        if (performance == null) {
+            return 0
+        }
+        
+        // Calculate volume for all exercises (completed, partial, or failed - as long as they have data)
+        val volume = performance.data.sumOf { ex ->
+            // Count volume if exercise has valid data (weight > 0, reps > 0, sets > 0)
+            // We count partial completions too, not just fully completed
+            if (ex.weight > 0 && ex.reps > 0 && ex.sets > 0) {
+                ex.weight * ex.reps * ex.sets
+            } else {
+                0
+            }
+        }
+        
+        // Log details for debugging
+        val logger = org.slf4j.LoggerFactory.getLogger(WorkoutServiceImpl::class.java)
+        if (volume == 0 && performance.data.isNotEmpty()) {
+            val details = performance.data.joinToString("; ") { 
+                "${it.name}: weight=${it.weight}, reps=${it.reps}, sets=${it.sets}, completed=${it.completed}, status=${it.status}" 
+            }
+            logger.warn("Total volume is 0 but exercises exist: $details")
+        } else if (performance.data.isNotEmpty()) {
+            logger.debug("Calculated total volume: $volume kg from ${performance.data.size} exercises")
+        }
+        
+        return volume
     }
     
     private suspend fun shouldSuggestDeload(recentWorkouts: List<Workout>): Boolean {

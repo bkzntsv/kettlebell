@@ -56,7 +56,7 @@ class AIServiceImpl(
             val finishReason = choice.finishReason?.toString()
             val tokensUsed = response.usage?.totalTokens ?: 0
             
-            logger.info("AI Response Content: $content")
+            logger.info("AI Response Content (raw): $content")
             
             logger.info(
                 "Workout plan generated: tokens=$tokensUsed, finishReason=$finishReason, " +
@@ -110,6 +110,7 @@ class AIServiceImpl(
             val finishReason = choice.finishReason?.toString()
             val tokensUsed = response.usage?.totalTokens ?: 0
             
+            logger.info("AI Feedback Analysis Response (raw): $content")
             logger.info(
                 "Feedback analyzed: tokens=$tokensUsed, finishReason=$finishReason, " +
                 "time=${System.currentTimeMillis() - startTime}ms"
@@ -150,100 +151,80 @@ class AIServiceImpl(
         val recentWorkoutsInfo = context.recentWorkouts
             .filter { it.actualPerformance != null }
             .take(3)
-            .joinToString("\n\n") { workout ->
-                buildString {
-                    append("Date: ${workout.timing.completedAt}\n")
-                    workout.actualPerformance?.let { perf ->
-                        append("RPE: ${perf.rpe ?: "not specified"}\n")
-                        append("Exercises:\n")
-                        perf.data.forEach { ex ->
-                            append("- ${ex.name}: ${ex.weight}kg, ${ex.reps}×${ex.sets}, " +
-                                "completed: ${if (ex.completed) "yes" else "no"}\n")
-                        }
-                        if (perf.issues.isNotEmpty()) {
-                            append("Issues: ${perf.issues.joinToString(", ")}\n")
-                        }
-                    }
+            .joinToString(",\n") { workout ->
+                val perf = workout.actualPerformance!!
+                val exercisesStr = perf.data.joinToString(", ") { ex ->
+                    "${ex.name} (${ex.weight}kg)"
                 }
+                val issuesStr = if (perf.issues.isNotEmpty()) perf.issues.joinToString("\", \"", "\"", "\"") else ""
+                
+                """
+                {
+                  "date": "${workout.timing.completedAt}",
+                  "exercises": "$exercisesStr",
+                  "rpe": ${perf.rpe ?: "null"},
+                  "red_flags": [${if (perf.issues.isNotEmpty()) issuesStr else ""}]
+                }
+                """.trimIndent()
             }
         
-        return buildString {
-            append("Create a personalized kettlebell workout plan.\n\n")
-            append("Athlete Profile:\n")
-            append("- Experience: ${profile.experience.name}\n")
-            append("- Body Weight: ${profile.bodyWeight}kg\n")
-            append("- Gender: ${profile.gender.name}\n")
-            append("- Goal: ${profile.goal}\n")
-            append("- Available Kettlebells: ${profile.weights.joinToString(", ")}kg\n")
-            append("CRITICAL: Use ONLY the available kettlebell weights listed above. Do not invent other weights.\n\n")
-            
-            append("Workout History (last ${context.recentWorkouts.size}):\n")
-            append(if (recentWorkoutsInfo.isNotEmpty()) recentWorkoutsInfo else "No completed workouts")
-            append("\n\n")
-            
-            append("Training Week: ${context.trainingWeek}\n\n")
-            
-            if (context.suggestDeload) {
-                append("IMPORTANT: The user has been training with high intensity and stagnating volume recently. Generate a DELOAD workout (lower volume, focus on technique/mobility, RPE 5-6).\n\n")
+        return """
+            {
+              "context": {
+                "athlete": {
+                  "experience": "${profile.experience.name}",
+                  "weight": ${profile.bodyWeight},
+                  "gender": "${profile.gender.name}",
+                  "goal": "${profile.goal}"
+                },
+                "equipment": {
+                  "available_kettlebells": [${profile.weights.joinToString(", ")}]
+                },
+                "history": [
+                  $recentWorkoutsInfo
+                ],
+                "current_week": ${context.trainingWeek},
+                "is_deload": ${context.suggestDeload} 
+              },
+              "instructions": "Создай персонализированный план. Если is_deload = true, снизь объем на 40% и сфокусируйся на мобильности. Используй ТОЛЬКО веса из available_kettlebells. Добавь краткие рекомендации по технике (coaching_tips) для каждого упражнения."
             }
-            
-            append("Create a plan in JSON format:\n")
-            append("{\n")
-            append("  \"warmup\": \"warmup description\",\n")
-            append("  \"exercises\": [\n")
-            append("    {\n")
-            append("      \"name\": \"exercise name\",\n")
-            append("      \"weight\": weight_in_kg,\n")
-            append("      \"reps\": reps_count_or_null,\n")
-            append("      \"sets\": sets_count_or_null,\n")
-            append("      \"timeWork\": work_time_seconds_or_null,\n")
-            append("      \"timeRest\": rest_time_seconds_or_null\n")
-            append("    }\n")
-            append("  ],\n")
-            append("  \"cooldown\": \"cooldown description\"\n")
-            append("}")
-        }
+        """.trimIndent()
     }
     
     private fun buildFeedbackAnalysisPrompt(feedback: String, originalPlan: WorkoutPlan): String {
-        val exercisesInfo = originalPlan.exercises.joinToString("\n") { ex ->
-            "- ${ex.name}: ${ex.weight}kg, " +
-            if (ex.reps != null && ex.sets != null) {
-                "${ex.reps}×${ex.sets}"
-            } else {
-                "Work: ${ex.timeWork}s, Rest: ${ex.timeRest}s"
-            }
+        val exercisesInfo = originalPlan.exercises.joinToString(", ") { ex ->
+            "${ex.name}: ${ex.weight}kg, ${if (ex.reps != null) "${ex.reps}x${ex.sets}" else "${ex.timeWork}s work"}"
         }
         
         return """
-            Analyze workout feedback and extract structured data.
-            
-            Original Plan:
+            Сравни запланированную тренировку и отзыв пользователя.
+            План:
             Warmup: ${originalPlan.warmup}
-            Exercises:
-            $exercisesInfo
+            Exercises: [$exercisesInfo]
             Cooldown: ${originalPlan.cooldown}
-            
-            User Feedback:
-            $feedback
-            
-            Return JSON:
+
+            Отзыв пользователя: 
+            "$feedback"
+
+            КРИТИЧЕСКИ ВАЖНО: Ответ ТОЛЬКО в формате JSON, без дополнительного текста. Структура:
             {
-              "data": [
-                {
-                  "name": "exercise name",
-                  "weight": weight_in_kg,
-                  "reps": reps_count,
-                  "sets": sets_count,
-                  "completed": boolean
+              "actual_data": [
+                { 
+                  "name": "точное_название_упражнения_из_плана", 
+                  "weight": число_в_кг, 
+                  "reps": число_повторов, 
+                  "sets": число_подходов, 
+                  "status": "completed" 
                 }
               ],
-              "rpe": rpe_1_10_or_null,
-              "issues": ["issue1", "issue2"] or []
+              "rpe": число_от_1_до_10,
+              "recovery_status": "good/fatigued/injured",
+              "technical_notes": "краткий вывод о технике на основе слов пользователя",
+              "red_flags": ["список жалоб на боль или дискомфорт"],
+              "coach_feedback": "Твой ответ атлету"
             }
             
-            If an exercise is not mentioned, use data from the original plan.
-            If injuries or discomfort are mentioned, add them to issues.
+            ВАЖНО: Для каждого упражнения из плана ДОЛЖЕН быть объект в actual_data с реальными значениями weight, reps, sets. Если пользователь не указал конкретные числа, используй значения из плана, но установи status в "partial" или "failed" если упражнение не выполнено полностью.
         """.trimIndent()
     }
     
@@ -270,10 +251,19 @@ class AIServiceImpl(
     ): WorkoutPlan {
         try {
             val cleanedContent = cleanJsonContent(content)
+            logger.debug("Cleaned JSON content: $cleanedContent")
             val jsonObject = json.parseToJsonElement(cleanedContent).jsonObject
+            logger.debug("Parsed JSON keys: ${jsonObject.keys}")
+            
             val warmup = jsonObject["warmup"]?.jsonPrimitive?.content ?: ""
             val cooldown = jsonObject["cooldown"]?.jsonPrimitive?.content ?: ""
-            val exercisesJson = jsonObject["exercises"]?.jsonArray ?: throw IllegalStateException("No exercises in response")
+            val exercisesJson = jsonObject["exercises"]?.jsonArray
+            
+            if (exercisesJson == null) {
+                logger.error("No 'exercises' field found. Available keys: ${jsonObject.keys}")
+                logger.error("Full JSON structure: $jsonObject")
+                throw IllegalStateException("No exercises in response")
+            }
             
             val exercises = exercisesJson.map { value ->
                 val ex = value.jsonObject
@@ -283,11 +273,20 @@ class AIServiceImpl(
                     reps = ex["reps"]?.jsonPrimitive?.content?.toIntOrNull(),
                     sets = ex["sets"]?.jsonPrimitive?.content?.toIntOrNull(),
                     timeWork = ex["timeWork"]?.jsonPrimitive?.content?.toIntOrNull(),
-                    timeRest = ex["timeRest"]?.jsonPrimitive?.content?.toIntOrNull()
+                    timeRest = ex["timeRest"]?.jsonPrimitive?.content?.toIntOrNull(),
+                    coachingTips = ex["coaching_tips"]?.jsonPrimitive?.content
                 )
             }
             
-            return WorkoutPlan(warmup = warmup, exercises = exercises, cooldown = cooldown)
+            val aiLog = AILog(
+                tokensUsed = tokensUsed,
+                modelVersion = gptModel.id,
+                planGenerationTime = generationTime,
+                feedbackAnalysisTime = null,
+                finishReason = finishReason
+            )
+            
+            return WorkoutPlan(warmup = warmup, exercises = exercises, cooldown = cooldown, aiLog = aiLog)
         } catch (e: Exception) {
             logger.error("Failed to parse workout plan: ${e.message}", e)
             throw IllegalStateException("Invalid workout plan format: ${e.message}", e)
@@ -303,30 +302,74 @@ class AIServiceImpl(
     ): ActualPerformance {
         try {
             val cleanedContent = cleanJsonContent(content)
+            logger.debug("Cleaned feedback JSON content: $cleanedContent")
             val jsonObject = json.parseToJsonElement(cleanedContent).jsonObject
-            val dataJson = jsonObject["data"]?.jsonArray ?: throw IllegalStateException("No data in response")
+            logger.debug("Parsed feedback JSON keys: ${jsonObject.keys}")
+            
+            val dataJson = jsonObject["actual_data"]?.jsonArray
+            if (dataJson == null) {
+                logger.error("No 'actual_data' field found. Available keys: ${jsonObject.keys}")
+                logger.error("Full JSON structure: $jsonObject")
+                throw IllegalStateException("No actual_data in response")
+            }
             
             val data = dataJson.map { value ->
                 val ex = value.jsonObject
+                val status = ex["status"]?.jsonPrimitive?.content
+                // Mapping status to boolean for backward compatibility
+                val completed = status == "completed" || status == "partial" 
+                
+                val name = ex["name"]?.jsonPrimitive?.content ?: ""
+                val weight = ex["weight"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                val reps = ex["reps"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                val sets = ex["sets"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                
+                logger.debug("Parsed exercise: name=$name, weight=$weight, reps=$reps, sets=$sets, completed=$completed, status=$status")
+                
                 ExercisePerformance(
-                    name = ex["name"]?.jsonPrimitive?.content ?: "",
-                    weight = ex["weight"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
-                    reps = ex["reps"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
-                    sets = ex["sets"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
-                    completed = ex["completed"]?.jsonPrimitive?.content?.toBoolean() ?: false
+                    name = name,
+                    weight = weight,
+                    reps = reps,
+                    sets = sets,
+                    completed = completed,
+                    status = status
                 )
             }
             
+            logger.info("Parsed ${data.size} exercises from feedback. Total volume calculation: ${data.sumOf { if (it.completed) it.weight * it.reps * it.sets else 0 }}")
+            
             val rpe = jsonObject["rpe"]?.jsonPrimitive?.content?.toIntOrNull()
-            val issuesJson = jsonObject["issues"]?.jsonArray
+            val issuesJson = jsonObject["red_flags"]?.jsonArray
             val issues = issuesJson?.map { it.jsonPrimitive.content } ?: emptyList()
             
-            return ActualPerformance(
+            val recoveryStatus = jsonObject["recovery_status"]?.jsonPrimitive?.content
+            val technicalNotes = jsonObject["technical_notes"]?.jsonPrimitive?.content
+            val coachFeedback = jsonObject["coach_feedback"]?.jsonPrimitive?.content
+            
+            logger.info("Parsed feedback analysis: rpe=$rpe, recoveryStatus=$recoveryStatus, technicalNotes=${technicalNotes?.take(100)}, issues=$issues, coachFeedback=${coachFeedback?.take(100)}")
+            
+            val aiLog = AILog(
+                tokensUsed = tokensUsed,
+                modelVersion = gptModel.id,
+                planGenerationTime = 0, // Not applicable here
+                feedbackAnalysisTime = analysisTime,
+                finishReason = finishReason
+            )
+            
+            val performance = ActualPerformance(
                 rawFeedback = rawFeedback,
                 data = data,
                 rpe = rpe,
-                issues = issues
+                issues = issues,
+                recoveryStatus = recoveryStatus,
+                technicalNotes = technicalNotes,
+                coachFeedback = coachFeedback,
+                aiLog = aiLog
             )
+            
+            logger.info("Created ActualPerformance: recoveryStatus=${performance.recoveryStatus}, technicalNotes=${performance.technicalNotes?.take(50)}, coachFeedback=${performance.coachFeedback?.take(50)}")
+            
+            return performance
         } catch (e: Exception) {
             logger.error("Failed to parse actual performance: ${e.message}", e)
             throw IllegalStateException("Invalid actual performance format: ${e.message}", e)
@@ -335,17 +378,50 @@ class AIServiceImpl(
     
     companion object {
         private const val SYSTEM_PROMPT_WORKOUT_GENERATION = """
-            You are an expert kettlebell coach. Create safe and effective workout plans based on the athlete's profile 
-            and training history. Adapt the load based on previous results. 
-            ALWAYS reply in RUSSIAN language.
-            Plan MUST contain at least 3 exercises.
-            Always return valid JSON without additional text.
+            Вы — элитный тренер по гиревому спорту (система StrongFirst/Hardstyle). Ваша цель — создавать безопасные, высокоэффективные программы, используя доказательные методики: периодизацию, управление RPE и баланс паттернов движения.
+            Ваши принципы:
+            Баланс паттернов: Каждая тренировка должна включать: Hip Hinge (махи/тяги), Squat (приседы), Push (жимы), Pull (тяги в наклоне).
+            Управление весом: Если доступный вес гири слишком велик для повторений, используйте методы деградации (снижение темпа, эксцентрические фазы). Если мал — увеличивайте плотность (EMOM) или время под нагрузкой.
+            Прогрессия: Анализируйте историю. Если прошлая тренировка была успешной, увеличивайте объем (+1-2 повторения или +1 подход), а не только вес.
+            Безопасность: Для новичков исключите сложные рывки. Фокус на стабильности плеча и нейтральной спине.
+            
+            КРИТИЧЕСКИ ВАЖНО: Ответ ТОЛЬКО в формате JSON, без дополнительного текста. Структура:
+            {
+              "warmup": "текст разминки",
+              "exercises": [
+                {
+                  "name": "название упражнения",
+                  "weight": число_в_кг,
+                  "reps": число_повторов_или_null,
+                  "sets": число_подходов_или_null,
+                  "timeWork": секунды_работы_или_null,
+                  "timeRest": секунды_отдыха_или_null,
+                  "coaching_tips": "совет по технике"
+                }
+              ],
+              "cooldown": "текст заминки"
+            }
+            Язык — РУССКИЙ.
         """
         
         private const val SYSTEM_PROMPT_FEEDBACK_ANALYSIS = """
-            You analyze workout feedback. Extract structured data about performed exercises, weights, reps, sets. 
-            Determine the RPE (Rate of Perceived Exertion) and identify any mentions of injuries or discomfort. 
-            Always return valid JSON without additional text.
+            Вы — аналитик спортивных данных и опытный тренер (StrongFirst).
+            Ваша задача:
+            1. Перевести свободный отзыв атлета в структурированные метрики.
+            2. Сгенерировать ответ тренера ("coach_feedback").
+            
+            Тон ответа тренера: Адаптируйся под стиль общения пользователя. Будь живым и человечным.
+            - Если пользователь пишет кратко и сухо — отвечай так же четко и по делу.
+            - Если пользователь эмоционален, шутит или использует сленг — поддержи этот тон, но оставайся в роли тренера.
+            - Реагируй на контекст: подбадривай при успехах, сочувствуй при усталости, но всегда направляй к цели.
+            - Если есть травма/боль: прояви заботу и профессиональную осторожность.
+            
+            Критически важно для аналитики:
+            Выявляйте маркеры боли (поясница, локти, плечи).
+            Оценивайте "Technical Failure" (если пользователь пишет, что 'техника поплыла').
+            Сравнивайте план и факт. Если количество повторений меньше плана — фиксируйте недобор.
+            Определяйте RPE (шкала 1-10) на основе эмоционального окраса текста, если число не указано явно.
+            Ответ ТОЛЬКО в JSON.
         """
     }
 }

@@ -123,4 +123,3 @@ data class WorkoutContext(
     val availableWeights: List<Int>,
     val trainingWeek: Int
 )
-

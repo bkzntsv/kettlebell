@@ -1,8 +1,8 @@
 # Kettlebell Training Bot
 
-Telegram-бот для персонализированных тренировок с гирями, использующий AI для адаптивного планирования.
+Telegram bot for personalized kettlebell training using AI for adaptive planning.
 
-## Технологии
+## Tech Stack
 
 - Kotlin 1.9.22
 - Ktor 2.3.8
@@ -11,9 +11,9 @@ Telegram-бот для персонализированных тренирово
 - Koin (Dependency Injection)
 - Kotest (Testing)
 
-## Настройка
+## Setup
 
-1. Установите переменные окружения:
+1. Set environment variables:
    ```bash
    export TELEGRAM_BOT_TOKEN=your_bot_token
    export OPENAI_API_KEY=your_openai_key
@@ -22,25 +22,24 @@ Telegram-бот для персонализированных тренирово
    export FREE_MONTHLY_LIMIT=10
    ```
 
-2. Для локальной разработки с Telegram webhook используйте ngrok:
+2. For local development with Telegram webhook use ngrok:
    ```bash
    ngrok http 8080
    ```
 
-3. Зарегистрируйте webhook:
+3. Register webhook:
    ```bash
    curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=https://<ngrok_url>/webhook/<YOUR_BOT_TOKEN>"
    ```
 
-## Запуск
+## Run
 
 ```bash
 ./gradlew run
 ```
 
-## Тестирование
+## Testing
 
 ```bash
 ./gradlew test
 ```
-

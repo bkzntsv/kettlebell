@@ -9,4 +9,3 @@ interface AIService {
     suspend fun transcribeVoice(audioFile: ByteArray): String
     suspend fun analyzeFeedback(feedback: String, originalPlan: WorkoutPlan): ActualPerformance
 }
-

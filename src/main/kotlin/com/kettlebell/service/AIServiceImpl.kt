@@ -149,53 +149,53 @@ class AIServiceImpl(
             .take(3)
             .joinToString("\n\n") { workout ->
                 buildString {
-                    append("Дата: ${workout.timing.completedAt}\n")
+                    append("Date: ${workout.timing.completedAt}\n")
                     workout.actualPerformance?.let { perf ->
-                        append("RPE: ${perf.rpe ?: "не указано"}\n")
-                        append("Упражнения:\n")
+                        append("RPE: ${perf.rpe ?: "not specified"}\n")
+                        append("Exercises:\n")
                         perf.data.forEach { ex ->
                             append("- ${ex.name}: ${ex.weight}kg, ${ex.reps}×${ex.sets}, " +
-                                "выполнено: ${if (ex.completed) "да" else "нет"}\n")
+                                "completed: ${if (ex.completed) "yes" else "no"}\n")
                         }
                         if (perf.issues.isNotEmpty()) {
-                            append("Проблемы: ${perf.issues.joinToString(", ")}\n")
+                            append("Issues: ${perf.issues.joinToString(", ")}\n")
                         }
                     }
                 }
             }
         
         return """
-            Создай персонализированный план тренировки с гирями.
+            Create a personalized kettlebell workout plan.
             
-            Профиль атлета:
-            - Опыт: ${profile.experience.name}
-            - Вес тела: ${profile.bodyWeight}kg
-            - Пол: ${profile.gender.name}
-            - Цель: ${profile.goal}
-            - Доступные гири: ${profile.weights.joinToString(", ")}kg
+            Athlete Profile:
+            - Experience: ${profile.experience.name}
+            - Body Weight: ${profile.bodyWeight}kg
+            - Gender: ${profile.gender.name}
+            - Goal: ${profile.goal}
+            - Available Kettlebells: ${profile.weights.joinToString(", ")}kg
             
-            История тренировок (последние ${context.recentWorkouts.size}):
-            ${if (recentWorkoutsInfo.isNotEmpty()) recentWorkoutsInfo else "Нет завершенных тренировок"}
+            Workout History (last ${context.recentWorkouts.size}):
+            ${if (recentWorkoutsInfo.isNotEmpty()) recentWorkoutsInfo else "No completed workouts"}
             
-            Неделя тренировок: ${context.trainingWeek}
+            Training Week: ${context.trainingWeek}
             
-            Создай план в формате JSON:
+            Create a plan in JSON format:
             {
-              "warmup": "разминка",
+              "warmup": "warmup description",
               "exercises": [
                 {
-                  "name": "название упражнения",
-                  "weight": вес_в_кг,
-                  "reps": количество_повторений_или_null,
-                  "sets": количество_подходов_или_null,
-                  "timeWork": время_работы_в_секундах_или_null,
-                  "timeRest": время_отдыха_в_секундах_или_null
+                  "name": "exercise name",
+                  "weight": weight_in_kg,
+                  "reps": reps_count_or_null,
+                  "sets": sets_count_or_null,
+                  "timeWork": work_time_seconds_or_null,
+                  "timeRest": rest_time_seconds_or_null
                 }
               ],
-              "cooldown": "заминка"
+              "cooldown": "cooldown description"
             }
             
-            Учти историю тренировок для адаптации нагрузки.
+            Adapt the load based on workout history.
         """.trimIndent()
     }
     
@@ -205,39 +205,39 @@ class AIServiceImpl(
             if (ex.reps != null && ex.sets != null) {
                 "${ex.reps}×${ex.sets}"
             } else {
-                "Работа: ${ex.timeWork}с, Отдых: ${ex.timeRest}с"
+                "Work: ${ex.timeWork}s, Rest: ${ex.timeRest}s"
             }
         }
         
         return """
-            Проанализируй обратную связь о тренировке и извлеки структурированные данные.
+            Analyze workout feedback and extract structured data.
             
-            Оригинальный план:
-            Разминка: ${originalPlan.warmup}
-            Упражнения:
+            Original Plan:
+            Warmup: ${originalPlan.warmup}
+            Exercises:
             $exercisesInfo
-            Заминка: ${originalPlan.cooldown}
+            Cooldown: ${originalPlan.cooldown}
             
-            Обратная связь пользователя:
+            User Feedback:
             $feedback
             
-            Верни JSON:
+            Return JSON:
             {
               "data": [
                 {
-                  "name": "название упражнения",
-                  "weight": вес_в_кг,
-                  "reps": количество_повторений,
-                  "sets": количество_подходов,
-                  "completed": выполнено_ли_полностью
+                  "name": "exercise name",
+                  "weight": weight_in_kg,
+                  "reps": reps_count,
+                  "sets": sets_count,
+                  "completed": boolean
                 }
               ],
-              "rpe": оценка_нагрузки_1_10_или_null,
-              "issues": ["проблема1", "проблема2"] или []
+              "rpe": rpe_1_10_or_null,
+              "issues": ["issue1", "issue2"] or []
             }
             
-            Если упражнение не упомянуто, используй данные из оригинального плана.
-            Если упомянуты травмы или дискомфорт, добавь их в issues.
+            If an exercise is not mentioned, use data from the original plan.
+            If injuries or discomfort are mentioned, add them to issues.
         """.trimIndent()
     }
     
@@ -312,16 +312,14 @@ class AIServiceImpl(
     
     companion object {
         private const val SYSTEM_PROMPT_WORKOUT_GENERATION = """
-            Ты эксперт по тренировкам с гирями. Создавай безопасные и эффективные планы тренировок 
-            на основе профиля атлета и его истории тренировок. Адаптируй нагрузку в зависимости от 
-            предыдущих результатов. Всегда возвращай валидный JSON без дополнительного текста.
+            You are an expert kettlebell coach. Create safe and effective workout plans based on the athlete's profile 
+            and training history. Adapt the load based on previous results. Always return valid JSON without additional text.
         """
         
         private const val SYSTEM_PROMPT_FEEDBACK_ANALYSIS = """
-            Ты анализируешь обратную связь о тренировке. Извлекай структурированные данные о 
-            выполненных упражнениях, весах, повторениях, подходах. Определяй уровень нагрузки (RPE) 
-            и выявляй упоминания травм или дискомфорта. Всегда возвращай валидный JSON без 
-            дополнительного текста.
+            You analyze workout feedback. Extract structured data about performed exercises, weights, reps, sets. 
+            Determine the RPE (Rate of Perceived Exertion) and identify any mentions of injuries or discomfort. 
+            Always return valid JSON without additional text.
         """
     }
 }

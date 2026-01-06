@@ -24,9 +24,12 @@ import org.koin.dsl.module
 fun appModule(environment: ApplicationEnvironment) = module {
     single { AppConfig.create(environment) }
     
+    single<MongoClient> {
+        KMongo.createClient(get<AppConfig>().mongodbConnectionUri)
+    }
+
     single<CoroutineDatabase> {
-        val client = KMongo.createClient(get<AppConfig>().mongodbConnectionUri)
-        client.coroutine.getDatabase(get<AppConfig>().mongodbDatabaseName)
+        get<MongoClient>().coroutine.getDatabase(get<AppConfig>().mongodbDatabaseName)
     }
     
     single<UserRepository> { MongoUserRepository(get()) }
@@ -46,7 +49,8 @@ fun appModule(environment: ApplicationEnvironment) = module {
         WorkoutServiceImpl(
             workoutRepository = get(),
             userRepository = get(),
-            aiService = get()
+            aiService = get(),
+            config = get()
         )
     }
 }

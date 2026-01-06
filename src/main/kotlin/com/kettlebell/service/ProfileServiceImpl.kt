@@ -8,6 +8,7 @@ class ProfileServiceImpl(
     private val userRepository: UserRepository
 ) : ProfileService {
     override suspend fun createProfile(userId: Long, profileData: ProfileData): UserProfile {
+        validateWeights(profileData.weights)
         val profile = UserProfile(
             id = userId,
             fsmState = UserState.IDLE,
@@ -24,11 +25,17 @@ class ProfileServiceImpl(
     }
     
     override suspend fun updateEquipment(userId: Long, weights: List<Int>): UserProfile {
+        validateWeights(weights)
         val profile = userRepository.findById(userId) ?: throw IllegalStateException("Profile not found")
         val updatedProfile = profile.copy(
             profile = profile.profile.copy(weights = weights)
         )
         return userRepository.save(updatedProfile)
+    }
+    
+    private fun validateWeights(weights: List<Int>) {
+        require(weights.isNotEmpty()) { "At least one kettlebell weight must be provided" }
+        require(weights.all { it > 0 }) { "All weights must be positive integers" }
     }
     
     override suspend fun updatePersonalData(userId: Long, bodyWeight: Float, gender: Gender): UserProfile {

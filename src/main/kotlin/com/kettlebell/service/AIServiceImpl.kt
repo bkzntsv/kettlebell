@@ -14,6 +14,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.jsonArray
 import kotlinx.coroutines.delay
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
@@ -251,9 +252,9 @@ class AIServiceImpl(
             val jsonObject = json.parseToJsonElement(content).jsonObject
             val warmup = jsonObject["warmup"]?.jsonPrimitive?.content ?: ""
             val cooldown = jsonObject["cooldown"]?.jsonPrimitive?.content ?: ""
-            val exercisesJson = jsonObject["exercises"]?.jsonObject ?: throw IllegalStateException("No exercises in response")
+            val exercisesJson = jsonObject["exercises"]?.jsonArray ?: throw IllegalStateException("No exercises in response")
             
-            val exercises = exercisesJson.entries.map { (_, value) ->
+            val exercises = exercisesJson.map { value ->
                 val ex = value.jsonObject
                 Exercise(
                     name = ex["name"]?.jsonPrimitive?.content ?: "",
@@ -281,9 +282,9 @@ class AIServiceImpl(
     ): ActualPerformance {
         try {
             val jsonObject = json.parseToJsonElement(content).jsonObject
-            val dataJson = jsonObject["data"]?.jsonObject ?: throw IllegalStateException("No data in response")
+            val dataJson = jsonObject["data"]?.jsonArray ?: throw IllegalStateException("No data in response")
             
-            val data = dataJson.entries.map { (_, value) ->
+            val data = dataJson.map { value ->
                 val ex = value.jsonObject
                 ExercisePerformance(
                     name = ex["name"]?.jsonPrimitive?.content ?: "",
@@ -295,8 +296,8 @@ class AIServiceImpl(
             }
             
             val rpe = jsonObject["rpe"]?.jsonPrimitive?.content?.toIntOrNull()
-            val issuesJson = jsonObject["issues"]?.jsonObject
-            val issues = issuesJson?.entries?.map { it.value.jsonPrimitive.content } ?: emptyList()
+            val issuesJson = jsonObject["issues"]?.jsonArray
+            val issues = issuesJson?.map { it.jsonPrimitive.content } ?: emptyList()
             
             return ActualPerformance(
                 rawFeedback = rawFeedback,

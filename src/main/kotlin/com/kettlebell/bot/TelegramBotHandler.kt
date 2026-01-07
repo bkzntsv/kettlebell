@@ -156,7 +156,9 @@ class TelegramBotHandler(
                     
                     if (updatesResponse.ok) {
                         for (update in updatesResponse.result) {
-                            handleUpdate(update)
+                            scope.launch {
+                                handleUpdate(update)
+                            }
                             offset = update.update_id + 1
                         }
                     }
@@ -796,7 +798,7 @@ class TelegramBotHandler(
                     val keyboard = InlineKeyboardMarkup(listOf(
                         listOf(InlineKeyboardButton("Завершить тренировку", "finish_workout:$workoutId"))
                     ))
-                    sendMessage(chatId, "Тренировка начата! Удачи! 💪\nНажми кнопку ниже, когда закончишь.", keyboard)
+                    sendMessage(chatId, "Тренировка началась! Удачи! 💪\nНажми кнопку ниже, когда закончишь.", keyboard)
                 }
                 "finish_workout" -> {
                     if (workoutId == null) return

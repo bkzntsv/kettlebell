@@ -6,6 +6,8 @@ import org.litote.kmongo.reactivestreams.KMongo
 import com.mongodb.reactivestreams.client.MongoClient
 import com.mongodb.client.MongoDatabase
 import com.aallam.openai.client.OpenAI
+import com.aallam.openai.api.http.Timeout
+import kotlin.time.Duration.Companion.seconds
 import com.kettlebell.config.AppConfig
 import com.kettlebell.repository.UserRepository
 import com.kettlebell.repository.WorkoutRepository
@@ -38,7 +40,10 @@ fun appModule(environment: ApplicationEnvironment) = module {
     single<WorkoutRepository> { MongoWorkoutRepository(get()) }
     
     single<OpenAI> {
-        OpenAI(token = get<AppConfig>().openaiApiKey)
+        OpenAI(
+            token = get<AppConfig>().openaiApiKey,
+            timeout = Timeout(socket = 120.seconds)
+        )
     }
     
     single<AIService> { AIServiceImpl(get(), get()) }

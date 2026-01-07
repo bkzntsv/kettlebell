@@ -70,7 +70,7 @@ class AIServiceImpl(
     override suspend fun transcribeVoice(audioFile: ByteArray): String {
         return withRetry(maxAttempts = 3) {
             val request = TranscriptionRequest(
-                audio = FileSource("voice.ogg", ByteArrayInputStream(audioFile).source()),
+                audio = FileSource(name = "voice.ogg", source = ByteArrayInputStream(audioFile).source()),
                 model = whisperModel,
                 language = "ru"
             )

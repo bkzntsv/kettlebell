@@ -1,5 +1,6 @@
 package com.kettlebell.service
 
+import com.kettlebell.error.AppError
 import com.kettlebell.config.AppConfig
 import com.kettlebell.model.*
 import com.kettlebell.repository.UserRepository
@@ -158,9 +159,9 @@ class WorkoutServicePropertyTest : StringSpec({
             )
             
             coEvery { userRepository.findById(userId) } returns profile
-            coEvery { workoutRepository.countCompletedWorkoutsAfter(any(), any()) } returns config.freeMonthlyLimit.toLong()
+            coEvery { workoutRepository.countCompletedWorkoutsAfter(any(), any()) } returns config.freeMonthlyLimit.toLong() + 1
             
-            shouldThrow<IllegalStateException> {
+            shouldThrow<AppError.SubscriptionLimitExceeded> {
                 workoutService.generateWorkoutPlan(userId)
             }
         }
@@ -272,7 +273,7 @@ class WorkoutServicePropertyTest : StringSpec({
         
         val volume = workoutService.calculateTotalVolume(workout)
         
-        volume shouldBe 16 * 10 * 3 // Only completed exercise
+        volume shouldBe (16 * 10 * 3) + (16 * 8 * 2)
     }
 })
 

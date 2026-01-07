@@ -1,5 +1,6 @@
 package com.kettlebell.service
 
+import com.kettlebell.error.AppError
 import com.kettlebell.config.AppConfig
 import com.kettlebell.model.*
 import com.kettlebell.repository.UserRepository
@@ -129,7 +130,7 @@ class WorkoutServiceTest : StringSpec({
         coEvery { userRepository.findById(userId) } returns profile
         coEvery { workoutRepository.countCompletedWorkoutsAfter(any(), any()) } returns config.freeMonthlyLimit.toLong()
         
-        shouldThrow<IllegalStateException> {
+        shouldThrow<AppError.SubscriptionLimitExceeded> {
             workoutService.generateWorkoutPlan(userId)
         }
     }

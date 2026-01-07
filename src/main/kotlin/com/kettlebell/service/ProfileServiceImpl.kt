@@ -84,5 +84,38 @@ class ProfileServiceImpl(
         )
         return userRepository.save(updatedProfile)
     }
+
+    override suspend fun updateScheduling(userId: Long, nextWorkout: Instant): UserProfile {
+        val profile = userRepository.findById(userId) ?: throw IllegalStateException("Profile not found")
+        val updatedProfile = profile.copy(
+            scheduling = UserScheduling(nextWorkout = nextWorkout)
+        )
+        return userRepository.save(updatedProfile)
+    }
+
+    override suspend fun clearScheduling(userId: Long): UserProfile {
+        val profile = userRepository.findById(userId) ?: throw IllegalStateException("Profile not found")
+        val updatedProfile = profile.copy(
+            scheduling = null
+        )
+        return userRepository.save(updatedProfile)
+    }
+
+    override suspend fun getUsersWithPendingReminders(): List<UserProfile> {
+        return userRepository.findUsersWithSchedule()
+    }
+
+    override suspend fun markReminderSent(userId: Long, type: String): UserProfile {
+        val profile = userRepository.findById(userId) ?: throw IllegalStateException("Profile not found")
+        val currentScheduling = profile.scheduling ?: return profile
+
+        val updatedScheduling = when (type) {
+            "1h" -> currentScheduling.copy(reminder1hSent = true)
+            "5m" -> currentScheduling.copy(reminder5mSent = true)
+            else -> currentScheduling
+        }
+
+        return userRepository.save(profile.copy(scheduling = updatedScheduling))
+    }
 }
 

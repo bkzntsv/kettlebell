@@ -10,7 +10,14 @@ data class UserProfile(
     val profile: ProfileData,
     val subscription: Subscription,
     val metadata: UserMetadata,
+    val scheduling: UserScheduling? = null,
     val schemaVersion: Int = 1
+)
+
+data class UserScheduling(
+    val nextWorkout: Instant,
+    val reminder1hSent: Boolean = false,
+    val reminder5mSent: Boolean = false
 )
 
 data class ProfileData(
@@ -53,6 +60,7 @@ enum class UserState {
     WORKOUT_REQUESTED,
     WORKOUT_IN_PROGRESS,
     WORKOUT_FEEDBACK_PENDING,
+    SCHEDULING_DATE,
     EDIT_EQUIPMENT,
     EDIT_EXPERIENCE,
     EDIT_PERSONAL_DATA,

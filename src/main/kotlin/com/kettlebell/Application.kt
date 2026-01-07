@@ -33,6 +33,18 @@ fun Application.module() {
     val botHandler by inject<TelegramBotHandler>()
     val config by inject<AppConfig>()
     
+    // Start reminder checker
+    launch {
+        while (true) {
+            try {
+                botHandler.checkReminders()
+            } catch (e: Exception) {
+                logger.error("Error in reminder loop", e)
+            }
+            kotlinx.coroutines.delay(60000) // Check every minute
+        }
+    }
+    
     // Start polling if configured
     if (config.botMode == "polling") {
         launch {

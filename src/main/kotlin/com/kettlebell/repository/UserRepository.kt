@@ -9,6 +9,7 @@ interface UserRepository {
     suspend fun save(profile: UserProfile): UserProfile
     suspend fun updateState(userId: Long, state: UserState)
     suspend fun updateSubscription(userId: Long, subscription: Subscription)
+    suspend fun findUsersWithSchedule(): List<UserProfile>
     suspend fun deleteById(userId: Long)
 }
 

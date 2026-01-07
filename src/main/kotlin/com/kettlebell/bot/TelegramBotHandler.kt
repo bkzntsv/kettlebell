@@ -224,6 +224,7 @@ class TelegramBotHandler(
             "/help" -> handleHelpCommand(chatId)
             "/profile" -> handleProfileCommand(userId, chatId)
             "/workout" -> handleWorkoutCommand(userId, chatId)
+            "/schedule" -> handleScheduleCommand(userId, chatId)
             "/history" -> handleHistoryCommand(userId, chatId)
             "/reset" -> handleResetCommand(userId, chatId)
             else -> sendMessage(chatId, "Неизвестная команда. Используйте /help для списка команд.")
@@ -329,52 +330,56 @@ class TelegramBotHandler(
         
         if (currentState != UserState.IDLE) {
             val keyboard = InlineKeyboardMarkup(listOf(
-                listOf(InlineKeyboardButton("Отменить текущее действие", "cancel_action"))
+                listOf(InlineKeyboardButton("Отменить текущую тренировку", "cancel_action"))
             ))
-            sendMessage(chatId, "Сейчас ты находишься в процессе. Заверши текущее действие перед созданием новой тренировки.", keyboard)
+            sendMessage(chatId, "У тебя уже есть программа тренировки. Заверши текущую тренировку перед тем как приступить к новой.", keyboard)
         } else {
-            try {
-                sendMessage(chatId, "Генерирую тренировку... Подождите немного.")
-                fsmManager.transitionTo(userId, UserState.WORKOUT_REQUESTED)
-                
-                val workout = errorHandler.withRetry {
-                    workoutService.generateWorkoutPlan(userId)
-                }
-                
-                val text = buildString {
-                    appendLine("💪 План тренировки:")
-                    appendLine()
-                    appendLine("Разминка:")
-                    appendLine(workout.plan.warmup)
-                    appendLine()
-                    appendLine("Упражнения:")
-                    workout.plan.exercises.forEachIndexed { index, ex ->
-                        append("${index + 1}. ${ex.name} - ${ex.weight}кг")
-                        if (ex.reps != null && ex.sets != null) {
-                            append(" (${ex.reps}×${ex.sets})")
-                        } else if (ex.timeWork != null && ex.timeRest != null) {
-                            append(" (Работа: ${ex.timeWork}с, Отдых: ${ex.timeRest}с)")
-                        }
-                        appendLine()
+            generateAndSendWorkout(userId, chatId)
+        }
+    }
+
+    private suspend fun generateAndSendWorkout(userId: Long, chatId: Long) {
+        try {
+            sendMessage(chatId, "Готовлю план тренировки... Подождите немного. (Это займет около 40 секунд)")
+            fsmManager.transitionTo(userId, UserState.WORKOUT_REQUESTED)
+            
+            val workout = errorHandler.withRetry {
+                workoutService.generateWorkoutPlan(userId)
+            }
+            
+            val text = buildString {
+                appendLine("💪 План тренировки:")
+                appendLine()
+                appendLine("Разминка:")
+                appendLine(workout.plan.warmup)
+                appendLine()
+                appendLine("Упражнения:")
+                workout.plan.exercises.forEachIndexed { index, ex ->
+                    append("${index + 1}. ${ex.name} - ${ex.weight}кг")
+                    if (ex.reps != null && ex.sets != null) {
+                        append(" (${ex.reps}×${ex.sets})")
+                    } else if (ex.timeWork != null && ex.timeRest != null) {
+                        append(" (Работа: ${ex.timeWork}с, Отдых: ${ex.timeRest}с)")
                     }
                     appendLine()
-                    appendLine("Заминка:")
-                    appendLine(workout.plan.cooldown)
                 }
-                
-                val keyboard = InlineKeyboardMarkup(listOf(
-                    listOf(InlineKeyboardButton("Начать тренировку", "start_workout:${workout.id}"))
-                ))
-                
-                sendMessage(chatId, text, keyboard)
-            } catch (e: AppError) {
-                fsmManager.transitionTo(userId, UserState.IDLE)
-                sendMessage(chatId, errorHandler.toUserMessage(e))
-            } catch (e: Exception) {
-                fsmManager.transitionTo(userId, UserState.IDLE)
-                val appError = errorHandler.wrapException(e)
-                sendMessage(chatId, errorHandler.toUserMessage(appError))
+                appendLine()
+                appendLine("Заминка:")
+                appendLine(workout.plan.cooldown)
             }
+            
+            val keyboard = InlineKeyboardMarkup(listOf(
+                listOf(InlineKeyboardButton("Начать тренировку", "start_workout:${workout.id}"))
+            ))
+            
+            sendMessage(chatId, text, keyboard)
+        } catch (e: AppError) {
+            fsmManager.transitionTo(userId, UserState.IDLE)
+            sendMessage(chatId, errorHandler.toUserMessage(e))
+        } catch (e: Exception) {
+            fsmManager.transitionTo(userId, UserState.IDLE)
+            val appError = errorHandler.wrapException(e)
+            sendMessage(chatId, errorHandler.toUserMessage(appError))
         }
     }
     
@@ -389,7 +394,13 @@ class TelegramBotHandler(
                 appendLine()
                 workouts.forEachIndexed { index, workout ->
                     if (workout.status == com.kettlebell.model.WorkoutStatus.COMPLETED) {
-                        appendLine("${index + 1}. ${workout.timing.completedAt?.let { java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy").format(it) } ?: "Дата неизвестна"}")
+                        val dateStr = workout.timing.completedAt?.let { 
+                            java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")
+                                .withZone(java.time.ZoneId.systemDefault())
+                                .format(it) 
+                        } ?: "Дата неизвестна"
+                        
+                        appendLine("${index + 1}. $dateStr")
                         workout.actualPerformance?.let { perf ->
                             val volume = workoutService.calculateTotalVolume(workout)
                             appendLine("   Объем: ${volume} кг")
@@ -418,6 +429,7 @@ class TelegramBotHandler(
             UserState.EDIT_EXPERIENCE -> sendMessage(chatId, handleEditExperience(userId, text))
             UserState.EDIT_PERSONAL_DATA -> sendMessage(chatId, handleEditPersonalData(userId, text))
             UserState.EDIT_GOAL -> sendMessage(chatId, handleEditGoal(userId, text))
+            UserState.SCHEDULING_DATE -> sendMessage(chatId, handleSchedulingDate(userId, text))
             UserState.WORKOUT_FEEDBACK_PENDING -> {
                 // Find latest workout pending feedback
                 val workouts = workoutService.getWorkoutHistory(userId, 1)
@@ -497,6 +509,9 @@ class TelegramBotHandler(
                 append(warning)
                 appendLine()
                 appendLine("Отдыхай!")
+                appendLine()
+                appendLine("Начните новую тренировку по команде /workout или заранее запланируйте следующую тренировку (/schedule).")
+                appendLine("Тренер напомнит за час до начала.")
             }
             
             logger.info("Sending message to user: ${message.take(200)}")
@@ -795,6 +810,7 @@ class TelegramBotHandler(
                 "start_workout" -> {
                     if (workoutId == null) return
                     workoutService.startWorkout(userId, workoutId)
+                    profileService.clearScheduling(userId) // Clear scheduled reminders as workout started
                     val keyboard = InlineKeyboardMarkup(listOf(
                         listOf(InlineKeyboardButton("Завершить тренировку", "finish_workout:$workoutId"))
                     ))
@@ -823,7 +839,13 @@ class TelegramBotHandler(
                 }
                 "cancel_action" -> {
                     fsmManager.transitionTo(userId, UserState.IDLE)
-                    sendMessage(chatId, "Действие отменено. Теперь ты можешь начать новую тренировку с /workout.")
+                    sendMessage(chatId, "Тренировка отменена. Теперь ты можешь начать новую тренировку с /workout.")
+                }
+                "schedule" -> {
+                    val whenOption = parts.getOrNull(1)
+                    if (whenOption != null) {
+                        handleQuickSchedule(userId, chatId, whenOption)
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -833,6 +855,104 @@ class TelegramBotHandler(
         }
     }
     
+    private suspend fun handleScheduleCommand(userId: Long, chatId: Long) {
+        fsmManager.transitionTo(userId, UserState.SCHEDULING_DATE)
+        
+        val keyboard = InlineKeyboardMarkup(listOf(
+            listOf(
+                InlineKeyboardButton("Завтра", "schedule:tomorrow"),
+                InlineKeyboardButton("Послезавтра", "schedule:dayafter")
+            ),
+            listOf(
+                InlineKeyboardButton("В понедельник", "schedule:monday")
+            )
+        ))
+        
+        sendMessage(chatId, "Введите дату и время следующей тренировки (например: 25.01 18:30) или выберите быстрый вариант:", keyboard)
+    }
+
+    private suspend fun handleQuickSchedule(userId: Long, chatId: Long, option: String) {
+        val now = java.time.LocalDateTime.now()
+        val scheduledTime = when(option) {
+            "tomorrow" -> now.plusDays(1).withHour(18).withMinute(0)
+            "dayafter" -> now.plusDays(2).withHour(18).withMinute(0)
+            "monday" -> now.with(java.time.temporal.TemporalAdjusters.next(java.time.DayOfWeek.MONDAY)).withHour(18).withMinute(0)
+            else -> return
+        }
+
+        val instant = scheduledTime.atZone(java.time.ZoneId.systemDefault()).toInstant()
+        profileService.updateScheduling(userId, instant)
+        fsmManager.transitionTo(userId, UserState.IDLE)
+        
+        val dateStr = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").format(scheduledTime)
+        sendMessage(chatId, "Тренировка запланирована на $dateStr. Тренер напомнит за час и за 5 минут до начала.")
+    }
+
+    private suspend fun handleSchedulingDate(userId: Long, text: String): String {
+        try {
+            val formatter = java.time.format.DateTimeFormatter.ofPattern("dd.MM HH:mm")
+            val now = java.time.LocalDateTime.now()
+
+            val temporalAccessor = formatter.parse(text.trim())
+            val monthDay = java.time.MonthDay.from(temporalAccessor)
+            val time = java.time.LocalTime.from(temporalAccessor)
+
+            var dateTime = java.time.LocalDateTime.of(now.year, monthDay.month, monthDay.dayOfMonth, time.hour, time.minute)
+
+            if (dateTime.isBefore(now)) {
+                dateTime = dateTime.plusYears(1)
+            }
+
+            val instant = dateTime.atZone(java.time.ZoneId.systemDefault()).toInstant()
+
+            profileService.updateScheduling(userId, instant)
+            fsmManager.transitionTo(userId, UserState.IDLE)
+
+            val dateStr = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").format(dateTime)
+            return "Тренировка запланирована на $dateStr. Тренер напомнит за час и за 5 минут до начала."
+        } catch (e: Exception) {
+            logger.error("Error parsing date: $text", e)
+            return "Не удалось распознать дату. Используйте формат ДД.ММ ЧЧ:ММ (например: 25.01 18:30)"
+        }
+    }
+
+    suspend fun checkReminders() {
+        try {
+            val users = profileService.getUsersWithPendingReminders()
+            val now = java.time.Instant.now()
+
+            users.forEach { user ->
+                try {
+                    val scheduling = user.scheduling ?: return@forEach
+                    val diff = java.time.Duration.between(now, scheduling.nextWorkout)
+                    val minutes = diff.toMinutes()
+
+                    if (minutes in 55..65 && !scheduling.reminder1hSent) {
+                        sendMessage(user.id, "⏰ Атлет, запланированная тренировка начнется через час! Но можем начать и сейчас, если хочешь.")
+                        profileService.markReminderSent(user.id, "1h")
+                    }
+
+                    if (minutes in 3..7 && !scheduling.reminder5mSent) {
+                        profileService.markReminderSent(user.id, "5m")
+                        scope.launch {
+                            val currentState = fsmManager.getCurrentState(user.id)
+                            if (currentState == UserState.IDLE) {
+                                sendMessage(user.id, "🚀 Время тренировки! Сейчас соберу для тебя программу на сегодня")
+                                generateAndSendWorkout(user.id, user.id) // Assuming chatId == userId for private chats
+                            } else {
+                                sendMessage(user.id, "🚀 Время тренировки! Напиши /workout, когда освободишься.")
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    logger.error("Error processing reminder for user ${user.id}", e)
+                }
+            }
+        } catch (e: Exception) {
+            logger.error("Error checking reminders", e)
+        }
+    }
+
     private suspend fun sendMessage(chatId: Long, text: String, replyMarkup: InlineKeyboardMarkup? = null) {
         try {
             val request = SendMessageRequest(chatId, text, replyMarkup)

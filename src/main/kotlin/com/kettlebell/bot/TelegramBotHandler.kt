@@ -16,6 +16,7 @@ import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +26,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import org.slf4j.LoggerFactory
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -124,6 +126,11 @@ class TelegramBotHandler(
                 ignoreUnknownKeys = true 
                 encodeDefaults = false 
             })
+        }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 60000 // 60 seconds for long polling
+            connectTimeoutMillis = 10000
+            socketTimeoutMillis = 60000
         }
     }
     private val json = Json { 
@@ -830,7 +837,7 @@ class TelegramBotHandler(
             
             val response = httpClient.post("$telegramApiUrl/sendMessage") {
                 contentType(ContentType.Application.Json)
-                setBody(json.encodeToString(SendMessageRequest.serializer(), request))
+                setBody(json.encodeToString(serializer<SendMessageRequest>(), request))
             }
             
             if (!response.status.isSuccess()) {

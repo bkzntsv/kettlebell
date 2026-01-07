@@ -25,7 +25,7 @@ class AIServiceImpl(
 ) : AIService {
     
     private val logger = LoggerFactory.getLogger(AIServiceImpl::class.java)
-    private val gptModel = ModelId("gpt-4o")
+    private val gptModel = ModelId("gpt-5-mini")
     private val whisperModel = ModelId("whisper-1")
     private val json = Json { ignoreUnknownKeys = true }
     

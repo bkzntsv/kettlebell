@@ -1,36 +1,33 @@
 package com.kettlebell.bot
 
+import com.kettlebell.config.AppConfig
+import com.kettlebell.error.AppError
+import com.kettlebell.error.ErrorHandler
 import com.kettlebell.model.ExperienceLevel
 import com.kettlebell.model.Gender
-import com.kettlebell.config.AppConfig
 import com.kettlebell.model.UserState
+import com.kettlebell.service.AIService
 import com.kettlebell.service.FSMManager
 import com.kettlebell.service.ProfileService
 import com.kettlebell.service.WorkoutService
-import com.kettlebell.service.AIService
-import com.kettlebell.error.ErrorHandler
-import com.kettlebell.error.AppError
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.*
+import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.serialization.kotlinx.json.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import org.slf4j.LoggerFactory
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.serializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.serializer
+import org.slf4j.LoggerFactory
 
 @Serializable
 data class TelegramUpdate(

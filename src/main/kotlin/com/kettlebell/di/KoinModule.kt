@@ -1,18 +1,14 @@
 package com.kettlebell.di
 
-import org.litote.kmongo.coroutine.CoroutineDatabase
-import org.litote.kmongo.coroutine.coroutine
-import org.litote.kmongo.reactivestreams.KMongo
-import com.mongodb.reactivestreams.client.MongoClient
-import com.mongodb.client.MongoDatabase
-import com.aallam.openai.client.OpenAI
 import com.aallam.openai.api.http.Timeout
-import kotlin.time.Duration.Companion.seconds
+import com.aallam.openai.client.OpenAI
+import com.kettlebell.bot.TelegramBotHandler
 import com.kettlebell.config.AppConfig
-import com.kettlebell.repository.UserRepository
-import com.kettlebell.repository.WorkoutRepository
+import com.kettlebell.error.ErrorHandler
 import com.kettlebell.repository.MongoUserRepository
 import com.kettlebell.repository.MongoWorkoutRepository
+import com.kettlebell.repository.UserRepository
+import com.kettlebell.repository.WorkoutRepository
 import com.kettlebell.service.AIService
 import com.kettlebell.service.AIServiceImpl
 import com.kettlebell.service.FSMManager
@@ -20,10 +16,13 @@ import com.kettlebell.service.ProfileService
 import com.kettlebell.service.ProfileServiceImpl
 import com.kettlebell.service.WorkoutService
 import com.kettlebell.service.WorkoutServiceImpl
-import com.kettlebell.bot.TelegramBotHandler
-import com.kettlebell.error.ErrorHandler
+import com.mongodb.reactivestreams.client.MongoClient
 import io.ktor.server.application.*
 import org.koin.dsl.module
+import org.litote.kmongo.coroutine.CoroutineDatabase
+import org.litote.kmongo.coroutine.coroutine
+import org.litote.kmongo.reactivestreams.KMongo
+import kotlin.time.Duration.Companion.seconds
 
 fun appModule(environment: ApplicationEnvironment) = module {
     single { AppConfig.create(environment) }

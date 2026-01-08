@@ -10,7 +10,7 @@ import org.litote.kmongo.ne
 import org.litote.kmongo.setValue
 
 class MongoUserRepository(
-    private val database: CoroutineDatabase
+    database: CoroutineDatabase
 ) : UserRepository {
     private val collection: CoroutineCollection<UserProfile> = 
         database.getCollection<UserProfile>("users")

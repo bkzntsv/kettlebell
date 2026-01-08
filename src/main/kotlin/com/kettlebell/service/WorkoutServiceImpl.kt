@@ -28,7 +28,7 @@ class WorkoutServiceImpl(
             val startOfMonth = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(30, ChronoUnit.DAYS) // Approximate month
             val count = workoutRepository.countCompletedWorkoutsAfter(userId, startOfMonth)
             if (count >= config.freeMonthlyLimit) {
-                throw AppError.SubscriptionLimitExceeded
+                throw AppError.SubscriptionLimitExceeded()
             }
         }
         

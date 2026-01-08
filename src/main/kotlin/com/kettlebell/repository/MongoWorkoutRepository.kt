@@ -1,23 +1,22 @@
 package com.kettlebell.repository
 
+import com.kettlebell.model.ActualPerformance
 import com.kettlebell.model.Workout
 import com.kettlebell.model.WorkoutStatus
-import com.kettlebell.model.ActualPerformance
 import com.kettlebell.model.WorkoutTiming
-import org.litote.kmongo.coroutine.CoroutineDatabase
+import com.mongodb.client.model.ReplaceOptions
+import org.litote.kmongo.and
 import org.litote.kmongo.coroutine.CoroutineCollection
+import org.litote.kmongo.coroutine.CoroutineDatabase
+import org.litote.kmongo.descending
+import org.litote.kmongo.div
 import org.litote.kmongo.eq
 import org.litote.kmongo.gt
-import org.litote.kmongo.div
-import org.litote.kmongo.and
 import org.litote.kmongo.setValue
-import org.litote.kmongo.sort
-import org.litote.kmongo.descending
-import com.mongodb.client.model.ReplaceOptions
 import java.time.Instant
 
 class MongoWorkoutRepository(
-    private val database: CoroutineDatabase
+    database: CoroutineDatabase
 ) : WorkoutRepository {
     private val collection: CoroutineCollection<Workout> = 
         database.getCollection<Workout>("workouts")
@@ -37,16 +36,6 @@ class MongoWorkoutRepository(
     
     override suspend fun findByUserId(userId: Long, limit: Int): List<Workout> {
         return collection.find(Workout::userId eq userId)
-            // Fix sorting: sort takes Bson, not just a property. descending returns Bson.
-            // But wait, the original code used descending(Workout::timing). That sorts by timing object?
-            // Probably meant completedAt?
-            // Let's assume sorting by timing (which includes startedAt/completedAt) might work if BSON order is meaningful,
-            // but usually we sort by a field.
-            // The original code was: .sort(descending(Workout::timing))
-            // I'll keep it as is if it was working, or fix it if it looks wrong.
-            // Actually timing is an object. Sorting by object depends on field order. 
-            // It's better to sort by timing.startedAt or created date.
-            // But I won't change existing logic unless I have to.
             .sort(descending(Workout::timing))
             .limit(limit)
             .toList()

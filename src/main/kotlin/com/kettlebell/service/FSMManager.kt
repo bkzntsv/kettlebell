@@ -24,7 +24,8 @@ class FSMManager(
                 UserState.EDIT_EQUIPMENT,
                 UserState.EDIT_EXPERIENCE,
                 UserState.EDIT_PERSONAL_DATA,
-                UserState.EDIT_GOAL
+                UserState.EDIT_GOAL,
+                UserState.SCHEDULING_DATE
             )
             
             // Onboarding flow
@@ -44,6 +45,9 @@ class FSMManager(
             UserState.EDIT_EXPERIENCE -> to == UserState.IDLE
             UserState.EDIT_PERSONAL_DATA -> to == UserState.IDLE
             UserState.EDIT_GOAL -> to == UserState.IDLE
+            
+            // Scheduling
+            UserState.SCHEDULING_DATE -> to == UserState.IDLE
         }
     }
 }

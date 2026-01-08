@@ -132,7 +132,7 @@ class ErrorHandler {
             is IllegalStateException -> {
                 when {
                     e.message?.contains("limit", ignoreCase = true) == true ->
-                        AppError.SubscriptionLimitExceeded
+                        AppError.SubscriptionLimitExceeded()
                     e.message?.contains("not found", ignoreCase = true) == true ->
                         AppError.UserNotFound(-1) // Can't extract userId from message
                     else ->

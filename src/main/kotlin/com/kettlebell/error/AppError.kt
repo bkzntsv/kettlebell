@@ -18,7 +18,7 @@ sealed class AppError(message: String, cause: Throwable? = null) : Exception(mes
     // Business Logic Errors
     class UserNotFound(val userId: Long) : AppError("User $userId not found")
     class WorkoutNotFound(val workoutId: String) : AppError("Workout $workoutId not found")
-    object SubscriptionLimitExceeded : AppError("Free monthly limit exceeded")
+    class SubscriptionLimitExceeded : AppError("Free monthly limit exceeded")
     class InvalidStateTransition(val from: String, val to: String) : AppError("Invalid state transition from $from to $to")
     
     // Unexpected Errors

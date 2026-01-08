@@ -33,7 +33,25 @@ import org.slf4j.LoggerFactory
 data class TelegramUpdate(
     val update_id: Long,
     val message: TelegramMessage? = null,
-    val callback_query: TelegramCallbackQuery? = null
+    val edited_message: TelegramMessage? = null,
+    val channel_post: TelegramMessage? = null,
+    val edited_channel_post: TelegramMessage? = null,
+    val callback_query: TelegramCallbackQuery? = null,
+    val my_chat_member: TelegramChatMemberUpdated? = null
+)
+
+@Serializable
+data class TelegramChatMemberUpdated(
+    val chat: TelegramChat,
+    val from: TelegramUser,
+    val date: Long,
+    val old_chat_member: TelegramChatMember,
+    val new_chat_member: TelegramChatMember
+)
+
+@Serializable
+data class TelegramChatMember(
+    val status: String
 )
 
 @Serializable
@@ -181,6 +199,12 @@ class TelegramBotHandler(
                 }
                 update.callback_query != null -> {
                     handleCallbackQuery(update.callback_query)
+                }
+                update.edited_message != null -> {
+                    logger.info("Ignored edited_message: ${update.update_id}")
+                }
+                update.my_chat_member != null -> {
+                    logger.info("Chat member status changed: ${update.my_chat_member.new_chat_member.status} for user ${update.my_chat_member.from.id}")
                 }
                 else -> {
                     logger.warn("Unsupported update type: ${update.update_id}")

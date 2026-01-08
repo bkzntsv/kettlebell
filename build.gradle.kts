@@ -16,14 +16,14 @@ repositories {
 
 dependencies {
     // Ktor
-    implementation("io.ktor:ktor-server-core:3.0.0")
-    implementation("io.ktor:ktor-server-netty:3.0.0")
-    implementation("io.ktor:ktor-server-content-negotiation:3.0.0")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.0")
-    implementation("io.ktor:ktor-server-cors:3.0.0")
+    implementation("io.ktor:ktor-server-core:2.3.12")
+    implementation("io.ktor:ktor-server-netty:2.3.12")
+    implementation("io.ktor:ktor-server-content-negotiation:2.3.12")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
+    implementation("io.ktor:ktor-server-cors:2.3.12")
     
     // Kotlinx Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     
     // MongoDB
     implementation("org.litote.kmongo:kmongo:4.11.0")
@@ -33,16 +33,16 @@ dependencies {
     implementation("com.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.1.0")
     
     // OpenAI
-    implementation("com.aallam.openai:openai-client:3.7.0")
-    implementation("io.ktor:ktor-client-core:3.0.0")
-    implementation("io.ktor:ktor-client-cio:3.0.0")
-    implementation("io.ktor:ktor-client-content-negotiation:3.0.0")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.0") // Add this for client serialization
+    implementation("com.aallam.openai:openai-client:3.8.2")
+    implementation("io.ktor:ktor-client-core:2.3.12")
+    implementation("io.ktor:ktor-client-cio:2.3.12")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.12")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12") // Add this for client serialization
     
     // Dependency Injection
-    implementation("io.insert-koin:koin-core:4.0.0")
-    implementation("io.insert-koin:koin-ktor:4.0.0")
-    implementation("io.insert-koin:koin-logger-slf4j:4.0.0")
+    implementation("io.insert-koin:koin-core:3.5.6")
+    implementation("io.insert-koin:koin-ktor:3.5.6")
+    implementation("io.insert-koin:koin-logger-slf4j:3.5.6")
     
     // Logging
     implementation("ch.qos.logback:logback-classic:1.4.14")
@@ -55,14 +55,14 @@ dependencies {
     testImplementation("io.mockk:mockk:1.13.10")
     testImplementation("org.testcontainers:mongodb:1.19.3")
     testImplementation("org.testcontainers:junit-jupiter:1.19.3")
-    testImplementation("io.ktor:ktor-server-test-host:3.0.0")
-    testImplementation("io.ktor:ktor-client-mock:3.0.0")
+    testImplementation("io.ktor:ktor-server-test-host:2.3.12")
+    testImplementation("io.ktor:ktor-client-mock:2.3.12")
 }
 
 tasks.withType<KotlinCompile> {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-        freeCompilerArgs.add("-Xcontext-receivers")
+        freeCompilerArgs.add("-Xcontext-parameters")
     }
 }
 

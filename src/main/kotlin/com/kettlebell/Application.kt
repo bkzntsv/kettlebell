@@ -51,6 +51,14 @@ fun Application.module() {
     }
 
     routing {
+        get("/") {
+            call.respond(HttpStatusCode.OK, "Kettlebell Bot is running!")
+        }
+
+        get("/health") {
+            call.respond(HttpStatusCode.OK, "OK")
+        }
+
         post("/webhook/{token}") {
             try {
                 val token = call.parameters["token"]

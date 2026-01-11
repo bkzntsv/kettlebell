@@ -1076,6 +1076,18 @@ class TelegramBotHandler(
                             )
                         }
                         profileService.markReminderSent(user.id, "1h")
+                    } else if (minutes in 8..54 && !scheduling.reminder1hSent) {
+                        // Recovery logic for missed 1h reminder
+                        logger.info("Recovering missed 1h reminder for user ${user.id} (minutes=$minutes)")
+                        errorHandler.withRetry(
+                            retryableErrors = setOf(AppError.UnexpectedError::class.java, AppError.AIServiceUnavailable::class.java),
+                        ) {
+                            sendMessage(
+                                user.id,
+                                "⏰ Напоминание: тренировка начнется через $minutes мин! (Извини, пропустил напоминание за час)",
+                            )
+                        }
+                        profileService.markReminderSent(user.id, "1h")
                     }
 
                     if (minutes in 3..7 && !scheduling.reminder5mSent) {

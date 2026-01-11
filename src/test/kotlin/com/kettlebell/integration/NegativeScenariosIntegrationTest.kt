@@ -106,18 +106,20 @@ class NegativeScenariosIntegrationTest : StringSpec({
             )
 
         val errorHandler = ErrorHandler()
-        val mockEngine = MockEngine { _ ->
-            respond(
-                content = """{"ok": true, "result": []}""",
-                status = HttpStatusCode.OK,
-                headers = headersOf("Content-Type", "application/json")
-            )
-        }
-        val mockHttpClient = HttpClient(mockEngine) {
-            install(ContentNegotiation) {
-                json(Json { ignoreUnknownKeys = true })
+        val mockEngine =
+            MockEngine { _ ->
+                respond(
+                    content = """{"ok": true, "result": []}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf("Content-Type", "application/json"),
+                )
             }
-        }
+        val mockHttpClient =
+            HttpClient(mockEngine) {
+                install(ContentNegotiation) {
+                    json(Json { ignoreUnknownKeys = true })
+                }
+            }
 
         botHandler =
             TelegramBotHandler(
@@ -127,7 +129,7 @@ class NegativeScenariosIntegrationTest : StringSpec({
                 workoutService = workoutService,
                 aiService = aiService,
                 errorHandler = errorHandler,
-                httpClient = mockHttpClient
+                httpClient = mockHttpClient,
             )
     }
 

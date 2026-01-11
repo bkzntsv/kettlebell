@@ -1,6 +1,6 @@
 # Kettlebell Training
 
-![Build Status](https://github.com/USERNAME/REPO_NAME/actions/workflows/ci.yml/badge.svg)
+![Build Status](https://github.com/bkzntsv/kettlebell/actions/workflows/ci.yml/badge.svg)
 
 AI-powered service for personalized kettlebell training with adaptive workout planning and feedback analysis.
 

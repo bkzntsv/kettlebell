@@ -1,45 +1,38 @@
-# Kettlebell Training Bot
+# Kettlebell Training
 
-Telegram bot for personalized kettlebell training using AI for adaptive planning.
+![Build Status](https://github.com/USERNAME/REPO_NAME/actions/workflows/ci.yml/badge.svg)
+
+AI-powered service for personalized kettlebell training with adaptive workout planning and feedback analysis.
+
+[**Start Training**](https://t.me/giryatrener_bot)
+
+## Key Features
+
+- **Personalized Onboarding**: Tailors the experience based on your available equipment (specific kettlebell weights), fitness experience, and goals.
+- **AI Workout Generation**: Creates unique workout plans adapted to your profile and past performance.
+- **Voice Feedback**: Supports voice messages for workout feedback - just talk about how it went.
+- **Adaptive Progression**: Analyzes your feedback (RPE, difficulty, technique) to adjust future training loads and intensity.
+- **History Tracking**: Keeps a log of your completed workouts for progress monitoring.
+
+## How It Works
+
+1. **Start**: Complete a quick onboarding to set up your profile and equipment.
+2. **Train**: Request a new workout via `/workout`. The bot generates a plan based on your current state.
+3. **Track**: Mark the workout as started and finished using interactive buttons.
+4. **Feedback**: detailed feedback via text or voice. The AI analyzes this to understand your performance.
+5. **Progress**: The next workout will be adjusted based on this feedback.
+
+## Commands
+
+- `/start` - Start the bot or resume onboarding.
+- `/workout` - Generate a new workout.
+- `/profile` - View and edit your settings (equipment, goals, etc.).
+- `/history` - View your training history.
+- `/help` - Show available commands.
 
 ## Tech Stack
 
-- Kotlin 1.9.22
-- Ktor 2.3.8
-- MongoDB (KMongo)
-- OpenAI API (GPT-4o, Whisper)
-- Koin (Dependency Injection)
-- Kotest (Testing)
-
-## Setup
-
-1. Set environment variables:
-   ```bash
-   export TELEGRAM_BOT_TOKEN=your_bot_token
-   export OPENAI_API_KEY=your_openai_key
-   export MONGODB_URI=mongodb://localhost:27017
-   export MONGODB_DATABASE_NAME=kettlebell_db
-   export FREE_MONTHLY_LIMIT=10
-   ```
-
-2. For local development with Telegram webhook use ngrok:
-   ```bash
-   ngrok http 8080
-   ```
-
-3. Register webhook:
-   ```bash
-   curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=https://<ngrok_url>/webhook/<YOUR_BOT_TOKEN>"
-   ```
-
-## Run
-
-```bash
-./gradlew run
-```
-
-## Testing
-
-```bash
-./gradlew test
-```
+- **Core**: Kotlin, Ktor
+- **AI**: OpenAI API (GPT, Whisper)
+- **Data**: MongoDB (KMongo)
+- **Infrastructure**: Docker

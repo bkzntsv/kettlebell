@@ -33,25 +33,7 @@ import org.slf4j.LoggerFactory
 data class TelegramUpdate(
     val update_id: Long,
     val message: TelegramMessage? = null,
-    val edited_message: TelegramMessage? = null,
-    val channel_post: TelegramMessage? = null,
-    val edited_channel_post: TelegramMessage? = null,
-    val callback_query: TelegramCallbackQuery? = null,
-    val my_chat_member: TelegramChatMemberUpdated? = null
-)
-
-@Serializable
-data class TelegramChatMemberUpdated(
-    val chat: TelegramChat,
-    val from: TelegramUser,
-    val date: Long,
-    val old_chat_member: TelegramChatMember,
-    val new_chat_member: TelegramChatMember
-)
-
-@Serializable
-data class TelegramChatMember(
-    val status: String
+    val callback_query: TelegramCallbackQuery? = null
 )
 
 @Serializable
@@ -199,12 +181,6 @@ class TelegramBotHandler(
                 }
                 update.callback_query != null -> {
                     handleCallbackQuery(update.callback_query)
-                }
-                update.edited_message != null -> {
-                    logger.info("Ignored edited_message: ${update.update_id}")
-                }
-                update.my_chat_member != null -> {
-                    logger.info("Chat member status changed: ${update.my_chat_member.new_chat_member.status} for user ${update.my_chat_member.from.id}")
                 }
                 else -> {
                     logger.warn("Unsupported update type: ${update.update_id}")
@@ -949,20 +925,40 @@ class TelegramBotHandler(
                     val minutes = diff.toMinutes()
 
                     if (minutes in 55..65 && !scheduling.reminder1hSent) {
-                        sendMessage(user.id, "⏰ Атлет, запланированная тренировка начнется через час! Но можем начать и сейчас, если хочешь.")
+                        logger.info("Sending 1h reminder to user ${user.id} (minutes=$minutes)")
+                        errorHandler.withRetry(
+                            retryableErrors = setOf(AppError.UnexpectedError::class.java, AppError.AIServiceUnavailable::class.java)
+                        ) {
+                            sendMessage(user.id, "⏰ Атлет, запланированная тренировка начнется через час! Но можем начать и сейчас, если хочешь.")
+                        }
                         profileService.markReminderSent(user.id, "1h")
                     }
 
                     if (minutes in 3..7 && !scheduling.reminder5mSent) {
-                        profileService.markReminderSent(user.id, "5m")
-                        scope.launch {
-                            val currentState = fsmManager.getCurrentState(user.id)
+                        logger.info("Sending 5m reminder to user ${user.id} (minutes=$minutes)")
+                        val currentState = fsmManager.getCurrentState(user.id)
+                        try {
                             if (currentState == UserState.IDLE) {
-                                sendMessage(user.id, "🚀 Время тренировки! Сейчас соберу для тебя программу на сегодня")
-                                generateAndSendWorkout(user.id, user.id) // Assuming chatId == userId for private chats
+                                errorHandler.withRetry(
+                                    retryableErrors = setOf(AppError.UnexpectedError::class.java, AppError.AIServiceUnavailable::class.java)
+                                ) {
+                                    sendMessage(user.id, "🚀 Время тренировки! Сейчас соберу для тебя программу на сегодня")
+                                }
+                                profileService.markReminderSent(user.id, "5m")
+                                scope.launch {
+                                    generateAndSendWorkout(user.id, user.id) // Assuming chatId == userId for private chats
+                                }
                             } else {
-                                sendMessage(user.id, "🚀 Время тренировки! Напиши /workout, когда освободишься.")
+                                errorHandler.withRetry(
+                                    retryableErrors = setOf(AppError.UnexpectedError::class.java, AppError.AIServiceUnavailable::class.java)
+                                ) {
+                                    sendMessage(user.id, "🚀 Время тренировки! Напиши /workout, когда освободишься.")
+                                }
+                                profileService.markReminderSent(user.id, "5m")
                             }
+                        } catch (e: Exception) {
+                            logger.error("Failed to send 5m reminder to user ${user.id}", e)
+                            throw e // Rethrow to trigger retry logic in outer loop
                         }
                     }
                 } catch (e: Exception) {
@@ -975,19 +971,17 @@ class TelegramBotHandler(
     }
 
     private suspend fun sendMessage(chatId: Long, text: String, replyMarkup: InlineKeyboardMarkup? = null) {
-        try {
-            val request = SendMessageRequest(chatId, text, replyMarkup)
-            
-            val response = httpClient.post("$telegramApiUrl/sendMessage") {
-                contentType(ContentType.Application.Json)
-                setBody(json.encodeToString(serializer<SendMessageRequest>(), request))
-            }
-            
-            if (!response.status.isSuccess()) {
-                logger.error("Failed to send message: ${response.status} ${response.bodyAsText()}")
-            }
-        } catch (e: Exception) {
-            logger.error("Error sending message", e)
+        val request = SendMessageRequest(chatId, text, replyMarkup)
+        
+        val response = httpClient.post("$telegramApiUrl/sendMessage") {
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(serializer<SendMessageRequest>(), request))
+        }
+        
+        if (!response.status.isSuccess()) {
+            val errorBody = response.bodyAsText()
+            logger.error("Failed to send message: ${response.status} $errorBody")
+            throw RuntimeException("Failed to send message: ${response.status} $errorBody")
         }
     }
 }

@@ -17,60 +17,60 @@ import com.kettlebell.service.ProfileServiceImpl
 import com.kettlebell.service.WorkoutService
 import com.kettlebell.service.WorkoutServiceImpl
 import com.mongodb.reactivestreams.client.MongoClient
-import io.ktor.server.application.*
+import io.ktor.server.application.ApplicationEnvironment
 import org.koin.dsl.module
 import org.litote.kmongo.coroutine.CoroutineDatabase
 import org.litote.kmongo.coroutine.coroutine
 import org.litote.kmongo.reactivestreams.KMongo
 import kotlin.time.Duration.Companion.seconds
 
-fun appModule(environment: ApplicationEnvironment) = module {
-    single { AppConfig.create(environment) }
-    
-    single<MongoClient> {
-        KMongo.createClient(get<AppConfig>().mongodbConnectionUri)
-    }
+fun appModule(environment: ApplicationEnvironment) =
+    module {
+        single { AppConfig.create(environment) }
 
-    single<CoroutineDatabase> {
-        get<MongoClient>().coroutine.getDatabase(get<AppConfig>().mongodbDatabaseName)
-    }
-    
-    single<UserRepository> { MongoUserRepository(get()) }
-    single<WorkoutRepository> { MongoWorkoutRepository(get()) }
-    
-    single<OpenAI> {
-        OpenAI(
-            token = get<AppConfig>().openaiApiKey,
-            timeout = Timeout(socket = 120.seconds)
-        )
-    }
-    
-    single<AIService> { AIServiceImpl(get(), get()) }
-    
-    single { FSMManager(get()) }
-    
-    single<ProfileService> { ProfileServiceImpl(get()) }
-    
-    single<WorkoutService> {
-        WorkoutServiceImpl(
-            workoutRepository = get(),
-            userRepository = get(),
-            aiService = get(),
-            config = get()
-        )
-    }
-    
-    single { ErrorHandler() }
-    
-    single {
-        TelegramBotHandler(
-            config = get(),
-            fsmManager = get(),
-            profileService = get(),
-            workoutService = get(),
-            aiService = get(),
-            errorHandler = get()
-        )
-    }
-}
+        single<MongoClient> {
+            KMongo.createClient(get<AppConfig>().mongodbConnectionUri)
+        }
 
+        single<CoroutineDatabase> {
+            get<MongoClient>().coroutine.getDatabase(get<AppConfig>().mongodbDatabaseName)
+        }
+
+        single<UserRepository> { MongoUserRepository(get()) }
+        single<WorkoutRepository> { MongoWorkoutRepository(get()) }
+
+        single<OpenAI> {
+            OpenAI(
+                token = get<AppConfig>().openaiApiKey,
+                timeout = Timeout(socket = 120.seconds),
+            )
+        }
+
+        single<AIService> { AIServiceImpl(get(), get()) }
+
+        single { FSMManager(get()) }
+
+        single<ProfileService> { ProfileServiceImpl(get()) }
+
+        single<WorkoutService> {
+            WorkoutServiceImpl(
+                workoutRepository = get(),
+                userRepository = get(),
+                aiService = get(),
+                config = get(),
+            )
+        }
+
+        single { ErrorHandler() }
+
+        single {
+            TelegramBotHandler(
+                config = get(),
+                fsmManager = get(),
+                profileService = get(),
+                workoutService = get(),
+                aiService = get(),
+                errorHandler = get(),
+            )
+        }
+    }

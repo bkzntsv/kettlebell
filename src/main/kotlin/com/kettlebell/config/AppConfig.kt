@@ -1,6 +1,6 @@
 package com.kettlebell.config
 
-import io.ktor.server.application.*
+import io.ktor.server.application.ApplicationEnvironment
 
 data class AppConfig(
     val telegramBotToken: String,
@@ -8,7 +8,7 @@ data class AppConfig(
     val mongodbConnectionUri: String,
     val mongodbDatabaseName: String,
     val freeMonthlyLimit: Int,
-    val botMode: String = "webhook"
+    val botMode: String = "webhook",
 ) {
     companion object {
         fun create(environment: ApplicationEnvironment): AppConfig {
@@ -18,9 +18,8 @@ data class AppConfig(
                 mongodbConnectionUri = environment.config.property("environment.mongodb.connection.uri").getString(),
                 mongodbDatabaseName = environment.config.property("environment.mongodb.database.name").getString(),
                 freeMonthlyLimit = environment.config.property("environment.subscription.free.monthly.limit").getString().toInt(),
-                botMode = environment.config.propertyOrNull("environment.bot.mode")?.getString() ?: "webhook"
+                botMode = environment.config.propertyOrNull("environment.bot.mode")?.getString() ?: "webhook",
             )
         }
     }
 }
-

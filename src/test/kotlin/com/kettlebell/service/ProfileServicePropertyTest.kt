@@ -14,12 +14,13 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
+import io.kotest.property.arbitrary.enum
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
-import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
 import io.mockk.coEvery
 import io.mockk.mockk
+import kotlinx.coroutines.runBlocking
 import java.time.Instant
 
 class ProfileServicePropertyTest : StringSpec({
@@ -129,7 +130,7 @@ class ProfileServicePropertyTest : StringSpec({
     }
 
     "Property 2: Goal Storage - should persist goal updates" {
-        checkAll(100, Arb.string(1..500)) { goal ->
+        checkAll(100, Arb.enum<TrainingGoal>()) { goal ->
             val userId = 123L
             val profile =
                 UserProfile(
@@ -156,9 +157,10 @@ class ProfileServicePropertyTest : StringSpec({
             coEvery { userRepository.findById(userId) } returns profile
             coEvery { userRepository.save(any()) } returns updatedProfile
 
-            val result = profileService.updateGoal(userId, goal)
-
-            result.profile.goal shouldBe goal
+            runBlocking {
+                val result = profileService.updateGoal(userId, goal)
+                result.profile.goal shouldBe goal
+            }
         }
     }
 })

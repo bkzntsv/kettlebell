@@ -79,8 +79,9 @@ class ProfileManagementTest : StringSpec({
 
     "should handle goal update" {
         checkAll(100, Arb.enum<TrainingGoal>()) { goal ->
-            // Goal should be non-empty string
-            goal.isNotEmpty() shouldBe true
+            // Goal should be a valid enum value
+            goal shouldNotBe null
+            goal.displayName().isNotEmpty() shouldBe true
         }
     }
 })

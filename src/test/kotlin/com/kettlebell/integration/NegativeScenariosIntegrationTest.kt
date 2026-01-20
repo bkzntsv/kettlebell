@@ -309,7 +309,10 @@ class NegativeScenariosIntegrationTest : StringSpec({
         runBlocking {
             val userId = 99904L
             // Создаем профиль и тренировку в статусе ожидания фидбека
-            profileService.createProfile(userId, ProfileData(listOf(16), ExperienceLevel.BEGINNER, 70f, Gender.MALE, "Goal"))
+            profileService.createProfile(
+                userId,
+                ProfileData(listOf(16), ExperienceLevel.BEGINNER, 70f, Gender.MALE, TrainingGoal.GENERAL_FITNESS),
+            )
             val plan = WorkoutPlan("Warmup", listOf(Exercise("Swing", 16, 10, 3, null, null)), "Cooldown")
 
             // Создаем напрямую в репозитории для скорости
@@ -357,7 +360,10 @@ class NegativeScenariosIntegrationTest : StringSpec({
         runBlocking {
             val userId = 99905L
             // Создаем профиль и тренировку
-            profileService.createProfile(userId, ProfileData(listOf(16), ExperienceLevel.BEGINNER, 70f, Gender.MALE, "Goal"))
+            profileService.createProfile(
+                userId,
+                ProfileData(listOf(16), ExperienceLevel.BEGINNER, 70f, Gender.MALE, TrainingGoal.GENERAL_FITNESS),
+            )
             val plan = WorkoutPlan("Warmup", listOf(Exercise("Swing", 16, 10, 3, null, null)), "Cooldown")
 
             val wId = java.util.UUID.randomUUID().toString()

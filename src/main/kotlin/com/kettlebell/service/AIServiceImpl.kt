@@ -32,6 +32,33 @@ class AIServiceImpl(
     private val whisperModel = ModelId("whisper-1")
     private val json = Json { ignoreUnknownKeys = true }
 
+    /**
+     * Правильно экранирует строку для вставки в JSON.
+     * Обрабатывает двойные кавычки, обратные слеши, и управляющие символы.
+     */
+    private fun escapeJsonString(value: String): String {
+        return buildString(value.length) {
+            value.forEach { char ->
+                when (char) {
+                    '"' -> append("\\\"")
+                    '\\' -> append("\\\\")
+                    '\n' -> append("\\n")
+                    '\r' -> append("\\r")
+                    '\t' -> append("\\t")
+                    '\b' -> append("\\b")
+                    '\u000C' -> append("\\f")
+                    else -> {
+                        if (char.code in 0x00..0x1F) {
+                            append("\\u${char.code.toString(16).padStart(4, '0')}")
+                        } else {
+                            append(char)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     override suspend fun generateWorkoutPlan(context: WorkoutContext): WorkoutPlan {
         return withRetry(maxAttempts = 3) {
             val startTime = System.currentTimeMillis()
@@ -185,7 +212,7 @@ class AIServiceImpl(
                                     actual.status ?: "failed"
                                 }
 
-                            val nameEscaped = actual.name.replace("\"", "\\\"")
+                            val nameEscaped = escapeJsonString(actual.name)
 
                             """
                             {
@@ -205,12 +232,12 @@ class AIServiceImpl(
 
                     val issuesStr =
                         if (perf.issues.isNotEmpty()) {
-                            perf.issues.map { it.replace("\"", "\\\"") }.joinToString("\", \"", "\"", "\"")
+                            perf.issues.map { escapeJsonString(it) }.joinToString("\", \"", "\"", "\"")
                         } else {
                             ""
                         }
-                    val technicalNotes = perf.technicalNotes?.takeIf { it.isNotBlank() }?.replace("\"", "\\\"") ?: ""
-                    val recoveryStatus = perf.recoveryStatus?.takeIf { it.isNotBlank() }?.replace("\"", "\\\"") ?: ""
+                    val technicalNotes = perf.technicalNotes?.takeIf { it.isNotBlank() }?.let { escapeJsonString(it) } ?: ""
+                    val recoveryStatus = perf.recoveryStatus?.takeIf { it.isNotBlank() }?.let { escapeJsonString(it) } ?: ""
 
                     val plannedExercisesStr =
                         plan.exercises.joinToString(", ") { ex ->
@@ -222,7 +249,7 @@ class AIServiceImpl(
                                 } else {
                                     ""
                                 }
-                            "${ex.name.replace("\"", "\\\"")} ${ex.weight}kg $repsSets".trim()
+                            "${escapeJsonString(ex.name)} ${ex.weight}kg $repsSets".trim()
                         }
 
                     """

@@ -150,12 +150,13 @@ class TelegramBotHandler(
 
     suspend fun startPolling() {
         logger.info("Starting Telegram Bot in POLLING mode...")
-        
+
         // Удаляем webhook перед запуском polling, чтобы избежать конфликта 409
         try {
-            val deleteWebhookResponse = httpClient.post("$telegramApiUrl/deleteWebhook") {
-                parameter("drop_pending_updates", true)
-            }
+            val deleteWebhookResponse =
+                httpClient.post("$telegramApiUrl/deleteWebhook") {
+                    parameter("drop_pending_updates", true)
+                }
             if (deleteWebhookResponse.status.isSuccess()) {
                 logger.info("Webhook successfully deleted")
             } else {
@@ -164,7 +165,7 @@ class TelegramBotHandler(
         } catch (e: Exception) {
             logger.warn("Error deleting webhook (may not be set): ${e.message}")
         }
-        
+
         var offset = 0L
 
         while (scope.isActive) {

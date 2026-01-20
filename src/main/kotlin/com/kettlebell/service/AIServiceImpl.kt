@@ -51,8 +51,6 @@ class AIServiceImpl(
                                 content = prompt,
                             ),
                         ),
-                    // Response format omitted for compatibility
-                    // responseFormat = com.aallam.openai.api.chat.ResponseFormat.JsonObject
                 )
 
             val response = openAIClient.chatCompletion(request)
@@ -108,8 +106,6 @@ class AIServiceImpl(
                                 content = prompt,
                             ),
                         ),
-                    // Response format omitted for compatibility
-                    // responseFormat = com.aallam.openai.api.chat.ResponseFormat.JsonObject
                 )
 
             val response = openAIClient.chatCompletion(request)
@@ -163,67 +159,71 @@ class AIServiceImpl(
                 .joinToString(",\n") { workout ->
                     val perf = workout.actualPerformance!!
                     val plan = workout.plan
-                    
-                    // Calculate total volume
-                    val totalVolume = perf.data.sumOf { ex ->
-                        if (ex.weight > 0 && ex.reps > 0 && ex.sets > 0) {
-                            ex.weight * ex.reps * ex.sets
-                        } else {
-                            0
+
+                    val totalVolume =
+                        perf.data.sumOf { ex ->
+                            if (ex.weight > 0 && ex.reps > 0 && ex.sets > 0) {
+                                ex.weight * ex.reps * ex.sets
+                            } else {
+                                0
+                            }
                         }
-                    }
-                    
-                    // Build detailed exercises list with plan vs actual comparison
-                    val exercisesDetail = perf.data.mapIndexed { index, actual ->
-                        val planned = plan.exercises.getOrNull(index)
-                        val plannedWeight = planned?.weight ?: 0
-                        val plannedReps = planned?.reps
-                        val plannedSets = planned?.sets
-                        val plannedTimeWork = planned?.timeWork
-                        val plannedTimeRest = planned?.timeRest
-                        
-                        val statusInfo = if (actual.completed) {
-                            if (actual.status == "completed") "completed" else actual.status ?: "completed"
-                        } else {
-                            actual.status ?: "failed"
-                        }
-                        
-                        val nameEscaped = actual.name.replace("\"", "\\\"")
-                        
-                        """
-                        {
-                          "name": "$nameEscaped",
-                          "planned_weight_kg": $plannedWeight,
-                          "planned_reps": ${plannedReps ?: "null"},
-                          "planned_sets": ${plannedSets ?: "null"},
-                          "planned_time_work_sec": ${plannedTimeWork ?: "null"},
-                          "planned_time_rest_sec": ${plannedTimeRest ?: "null"},
-                          "actual_weight_kg": ${actual.weight},
-                          "actual_reps": ${actual.reps},
-                          "actual_sets": ${actual.sets},
-                          "status": "$statusInfo"
-                        }""".trimIndent()
-                    }.joinToString(",\n")
-                    
-                    val issuesStr = if (perf.issues.isNotEmpty()) {
-                        perf.issues.map { it.replace("\"", "\\\"") }.joinToString("\", \"", "\"", "\"")
-                    } else {
-                        ""
-                    }
-                    val technicalNotes = perf.technicalNotes?.takeIf { it.isNotBlank() }?.replace("\"", "\\\"") ?: ""
-                    val recoveryStatus = perf.recoveryStatus?.takeIf { it.isNotBlank() }?.replace("\"", "\\\"") ?: ""
-                    
-                    // Build planned exercises summary
-                    val plannedExercisesStr = plan.exercises.joinToString(", ") { ex ->
-                        val repsSets = if (ex.reps != null && ex.sets != null) {
-                            "${ex.reps}x${ex.sets}"
-                        } else if (ex.timeWork != null && ex.timeRest != null) {
-                            "${ex.timeWork}s/${ex.timeRest}s"
+
+                    val exercisesDetail =
+                        perf.data.mapIndexed { index, actual ->
+                            val planned = plan.exercises.getOrNull(index)
+                            val plannedWeight = planned?.weight ?: 0
+                            val plannedReps = planned?.reps
+                            val plannedSets = planned?.sets
+                            val plannedTimeWork = planned?.timeWork
+                            val plannedTimeRest = planned?.timeRest
+
+                            val statusInfo =
+                                if (actual.completed) {
+                                    if (actual.status == "completed") "completed" else actual.status ?: "completed"
+                                } else {
+                                    actual.status ?: "failed"
+                                }
+
+                            val nameEscaped = actual.name.replace("\"", "\\\"")
+
+                            """
+                            {
+                              "name": "$nameEscaped",
+                              "planned_weight_kg": $plannedWeight,
+                              "planned_reps": ${plannedReps ?: "null"},
+                              "planned_sets": ${plannedSets ?: "null"},
+                              "planned_time_work_sec": ${plannedTimeWork ?: "null"},
+                              "planned_time_rest_sec": ${plannedTimeRest ?: "null"},
+                              "actual_weight_kg": ${actual.weight},
+                              "actual_reps": ${actual.reps},
+                              "actual_sets": ${actual.sets},
+                              "status": "$statusInfo"
+                            }
+                            """.trimIndent()
+                        }.joinToString(",\n")
+
+                    val issuesStr =
+                        if (perf.issues.isNotEmpty()) {
+                            perf.issues.map { it.replace("\"", "\\\"") }.joinToString("\", \"", "\"", "\"")
                         } else {
                             ""
                         }
-                        "${ex.name.replace("\"", "\\\"")} ${ex.weight}kg $repsSets".trim()
-                    }
+                    val technicalNotes = perf.technicalNotes?.takeIf { it.isNotBlank() }?.replace("\"", "\\\"") ?: ""
+                    val recoveryStatus = perf.recoveryStatus?.takeIf { it.isNotBlank() }?.replace("\"", "\\\"") ?: ""
+
+                    val plannedExercisesStr =
+                        plan.exercises.joinToString(", ") { ex ->
+                            val repsSets =
+                                if (ex.reps != null && ex.sets != null) {
+                                    "${ex.reps}x${ex.sets}"
+                                } else if (ex.timeWork != null && ex.timeRest != null) {
+                                    "${ex.timeWork}s/${ex.timeRest}s"
+                                } else {
+                                    ""
+                                }
+                            "${ex.name.replace("\"", "\\\"")} ${ex.weight}kg $repsSets".trim()
+                        }
 
                     """
                     {
@@ -396,7 +396,6 @@ class AIServiceImpl(
                 dataJson.map { value ->
                     val ex = value.jsonObject
                     val status = ex["status"]?.jsonPrimitive?.content
-                    // Mapping status to boolean for backward compatibility
                     val completed = status == "completed" || status == "partial"
 
                     val name = ex["name"]?.jsonPrimitive?.content ?: ""
@@ -441,7 +440,6 @@ class AIServiceImpl(
                 AILog(
                     tokensUsed = tokensUsed,
                     modelVersion = gptModel.id,
-                    // Not applicable here
                     planGenerationTime = 0,
                     feedbackAnalysisTime = analysisTime,
                     finishReason = finishReason,

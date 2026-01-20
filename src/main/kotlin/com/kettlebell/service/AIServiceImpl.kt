@@ -154,7 +154,7 @@ class AIServiceImpl(
         throw lastException ?: IllegalStateException("All retry attempts failed")
     }
 
-    private fun buildWorkoutPrompt(context: WorkoutContext): String {
+    internal fun buildWorkoutPrompt(context: WorkoutContext): String {
         val profile = context.profile.profile
         val recentWorkoutsInfo =
             context.recentWorkouts
@@ -205,7 +205,11 @@ class AIServiceImpl(
                         }""".trimIndent()
                     }.joinToString(",\n")
                     
-                    val issuesStr = if (perf.issues.isNotEmpty()) perf.issues.joinToString("\", \"", "\"", "\"") else ""
+                    val issuesStr = if (perf.issues.isNotEmpty()) {
+                        perf.issues.map { it.replace("\"", "\\\"") }.joinToString("\", \"", "\"", "\"")
+                    } else {
+                        ""
+                    }
                     val technicalNotes = perf.technicalNotes?.takeIf { it.isNotBlank() }?.replace("\"", "\\\"") ?: ""
                     val recoveryStatus = perf.recoveryStatus?.takeIf { it.isNotBlank() }?.replace("\"", "\\\"") ?: ""
                     

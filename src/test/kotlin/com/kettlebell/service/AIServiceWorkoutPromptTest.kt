@@ -11,6 +11,7 @@ import com.kettlebell.model.Gender
 import com.kettlebell.model.ProfileData
 import com.kettlebell.model.Subscription
 import com.kettlebell.model.SubscriptionType
+import com.kettlebell.model.TrainingGoal
 import com.kettlebell.model.UserMetadata
 import com.kettlebell.model.UserProfile
 import com.kettlebell.model.UserState
@@ -43,7 +44,7 @@ class AIServiceWorkoutPromptTest : StringSpec({
         experience: ExperienceLevel = ExperienceLevel.BEGINNER,
         bodyWeight: Float = 70f,
         gender: Gender = Gender.MALE,
-        goal: String = "Сила",
+        goal: TrainingGoal = TrainingGoal.STRENGTH,
     ): UserProfile {
         return UserProfile(
             id = 1L,
@@ -790,7 +791,7 @@ class AIServiceWorkoutPromptTest : StringSpec({
                 experience = ExperienceLevel.PRO,
                 bodyWeight = 85.5f,
                 gender = Gender.FEMALE,
-                goal = "Выносливость",
+                goal = TrainingGoal.ENDURANCE,
             )
         val context = WorkoutContext(profile, emptyList(), listOf(16, 24, 32), 5, true)
 

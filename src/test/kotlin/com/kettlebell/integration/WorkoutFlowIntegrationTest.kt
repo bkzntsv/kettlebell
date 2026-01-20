@@ -14,6 +14,7 @@ import com.kettlebell.model.ExercisePerformance
 import com.kettlebell.model.ExperienceLevel
 import com.kettlebell.model.Gender
 import com.kettlebell.model.ProfileData
+import com.kettlebell.model.TrainingGoal
 import com.kettlebell.model.UserState
 import com.kettlebell.model.WorkoutPlan
 import com.kettlebell.model.WorkoutStatus
@@ -119,7 +120,7 @@ class WorkoutFlowIntegrationTest : StringSpec({
                     experience = ExperienceLevel.AMATEUR,
                     bodyWeight = 75.0f,
                     gender = Gender.MALE,
-                    goal = "Улучшить силу",
+                    goal = TrainingGoal.STRENGTH,
                 )
             profileService.createProfile(userId, profileData)
             fsmManager.transitionTo(userId, UserState.IDLE)

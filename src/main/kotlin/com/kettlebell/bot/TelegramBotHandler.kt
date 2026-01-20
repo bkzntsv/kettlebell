@@ -5,6 +5,7 @@ import com.kettlebell.error.AppError
 import com.kettlebell.error.ErrorHandler
 import com.kettlebell.model.ExperienceLevel
 import com.kettlebell.model.Gender
+import com.kettlebell.model.TrainingGoal
 import com.kettlebell.model.UserState
 import com.kettlebell.service.AIService
 import com.kettlebell.service.FSMManager
@@ -303,7 +304,12 @@ class TelegramBotHandler(
             )
         } else {
             if (profile.fsmState != UserState.IDLE && profile.fsmState.name.startsWith("ONBOARDING")) {
-                sendMessage(chatId, resumeOnboarding(profile.fsmState))
+                if (profile.fsmState == UserState.ONBOARDING_GOALS) {
+                    val keyboard = createGoalSelectionKeyboard()
+                    sendMessage(chatId, resumeOnboarding(profile.fsmState), keyboard)
+                } else {
+                    sendMessage(chatId, resumeOnboarding(profile.fsmState))
+                }
             } else {
                 sendMessage(
                     chatId,
@@ -325,7 +331,7 @@ class TelegramBotHandler(
             UserState.ONBOARDING_EQUIPMENT -> "Какие у тебя есть гири? Напиши вес в кг через запятую (например: 16, 24)."
             UserState.ONBOARDING_EXPERIENCE -> "Какой у тебя опыт тренировок? (Новичок, Любитель, Про)."
             UserState.ONBOARDING_PERSONAL_DATA -> "Напиши свой вес (кг) и пол (М/Ж). Например: 80 М"
-            UserState.ONBOARDING_GOALS -> "Какая у тебя цель тренировок? (например: Сила, Выносливость, Похудение)"
+            UserState.ONBOARDING_GOALS -> "Выбери свою цель тренировок:"
             else -> "Продолжаем..."
         }
     }
@@ -362,7 +368,7 @@ class TelegramBotHandler(
                     appendLine("Вес тела: ${profile.profile.bodyWeight} кг")
                     appendLine("Пол: ${profile.profile.gender.name}")
                     appendLine("Доступные гири: ${profile.profile.weights.joinToString(", ")} кг")
-                    appendLine("Цель: ${profile.profile.goal}")
+                    appendLine("Цель: ${profile.profile.goal.displayName()}")
                 }
 
             val keyboard =
@@ -507,8 +513,11 @@ class TelegramBotHandler(
             UserState.ONBOARDING_MEDICAL_CONFIRM -> sendMessage(chatId, handleOnboardingMedical(userId, text))
             UserState.ONBOARDING_EQUIPMENT -> sendMessage(chatId, handleOnboardingEquipment(userId, text))
             UserState.ONBOARDING_EXPERIENCE -> sendMessage(chatId, handleOnboardingExperience(userId, text))
-            UserState.ONBOARDING_PERSONAL_DATA -> sendMessage(chatId, handleOnboardingPersonalData(userId, text))
-            UserState.ONBOARDING_GOALS -> sendMessage(chatId, handleOnboardingGoals(userId, text))
+            UserState.ONBOARDING_PERSONAL_DATA -> handleOnboardingPersonalData(userId, chatId, text)
+            UserState.ONBOARDING_GOALS -> {
+                val keyboard = createGoalSelectionKeyboard()
+                sendMessage(chatId, "Выбери свою цель тренировок:", keyboard)
+            }
             UserState.EDIT_EQUIPMENT -> sendMessage(chatId, handleEditEquipment(userId, text))
             UserState.EDIT_EXPERIENCE -> sendMessage(chatId, handleEditExperience(userId, text))
             UserState.EDIT_PERSONAL_DATA -> sendMessage(chatId, handleEditPersonalData(userId, text))
@@ -682,8 +691,9 @@ class TelegramBotHandler(
 
     private suspend fun handleOnboardingPersonalData(
         userId: Long,
+        chatId: Long,
         text: String,
-    ): String {
+    ) {
         // Simple regex to find a number (weight) and a letter (gender)
         val parts = text.split(" ", ",", ";").map { it.trim() }.filter { it.isNotEmpty() }
 
@@ -710,7 +720,8 @@ class TelegramBotHandler(
         }
 
         if (bodyWeight == null) {
-            return "Не удалось распознать вес. Пожалуйста, укажи вес числом (например: 80)."
+            sendMessage(chatId, "Не удалось распознать вес. Пожалуйста, укажи вес числом (например: 80).")
+            return
         }
 
         // Default gender if not parsed
@@ -719,11 +730,16 @@ class TelegramBotHandler(
         try {
             profileService.updatePersonalData(userId, bodyWeight, finalGender)
             fsmManager.transitionTo(userId, UserState.ONBOARDING_GOALS)
-            return "Вес: $bodyWeight кг, Пол: ${finalGender.name}.\n\n" +
-                "Последний шаг: какая у тебя основная цель тренировок?\n(например: Сила, Выносливость, Похудение, ОФП)"
+            val keyboard = createGoalSelectionKeyboard()
+            sendMessage(
+                chatId,
+                "Вес: $bodyWeight кг, Пол: ${finalGender.name}.\n\n" +
+                    "Последний шаг: выбери свою основную цель тренировок:",
+                keyboard,
+            )
         } catch (e: Exception) {
             logger.error("Error updating personal data", e)
-            return "Произошла ошибка. Попробуй еще раз."
+            sendMessage(chatId, "Произошла ошибка. Попробуй еще раз.")
         }
     }
 
@@ -731,24 +747,34 @@ class TelegramBotHandler(
         userId: Long,
         text: String,
     ): String {
-        if (text.isBlank()) {
-            return "Пожалуйста, напиши свою цель."
-        }
+        // This should not be called anymore as we use callback buttons
+        // But keep for backward compatibility
+        return "Пожалуйста, выбери цель из предложенных вариантов."
+    }
 
-        try {
-            profileService.updateGoal(userId, text.trim())
-            fsmManager.transitionTo(userId, UserState.IDLE)
-            return """
-                Отлично! Твой профиль создан.
-                
-                Цель: $text
-                
-                Теперь ты можешь создать свою первую тренировку командой /workout.
-                """.trimIndent()
-        } catch (e: Exception) {
-            logger.error("Error updating goal", e)
-            return "Произошла ошибка. Попробуй еще раз."
-        }
+    private fun createGoalSelectionKeyboard(): InlineKeyboardMarkup {
+        return InlineKeyboardMarkup(
+            listOf(
+                listOf(
+                    InlineKeyboardButton(TrainingGoal.STRENGTH.displayNameWithDescription(), "select_goal:${TrainingGoal.STRENGTH.name}"),
+                ),
+                listOf(
+                    InlineKeyboardButton(TrainingGoal.ENDURANCE.displayNameWithDescription(), "select_goal:${TrainingGoal.ENDURANCE.name}"),
+                ),
+                listOf(
+                    InlineKeyboardButton(
+                        TrainingGoal.WEIGHT_LOSS.displayNameWithDescription(),
+                        "select_goal:${TrainingGoal.WEIGHT_LOSS.name}",
+                    ),
+                ),
+                listOf(
+                    InlineKeyboardButton(
+                        TrainingGoal.GENERAL_FITNESS.displayNameWithDescription(),
+                        "select_goal:${TrainingGoal.GENERAL_FITNESS.name}",
+                    ),
+                ),
+            ),
+        )
     }
 
     private suspend fun handleEditEquipment(
@@ -863,22 +889,9 @@ class TelegramBotHandler(
         userId: Long,
         text: String,
     ): String {
-        if (text.isBlank()) {
-            return "Пожалуйста, напиши свою цель."
-        }
-
-        return try {
-            errorHandler.withRetry {
-                profileService.updateGoal(userId, text.trim())
-            }
-            fsmManager.transitionTo(userId, UserState.IDLE)
-            "Цель обновлена: $text\n\nИзменения применятся к будущим тренировкам."
-        } catch (e: AppError) {
-            errorHandler.toUserMessage(e)
-        } catch (e: Exception) {
-            val appError = errorHandler.wrapException(e)
-            errorHandler.toUserMessage(appError)
-        }
+        // This should not be called anymore as we use callback buttons
+        // But keep for backward compatibility
+        return "Пожалуйста, выбери цель из предложенных вариантов."
     }
 
     private suspend fun handleVoiceMessage(message: TelegramMessage) {
@@ -971,11 +984,52 @@ class TelegramBotHandler(
                 }
                 "edit_goal" -> {
                     fsmManager.transitionTo(userId, UserState.EDIT_GOAL)
-                    sendMessage(chatId, "Напиши свою новую цель тренировок.")
+                    val keyboard = createGoalSelectionKeyboard()
+                    sendMessage(chatId, "Выбери свою новую цель тренировок:", keyboard)
                 }
                 "cancel_action" -> {
                     fsmManager.transitionTo(userId, UserState.IDLE)
                     sendMessage(chatId, "Тренировка отменена. Теперь ты можешь начать новую тренировку с /workout.")
+                }
+                "select_goal" -> {
+                    val goalName = parts.getOrNull(1)
+                    if (goalName != null) {
+                        try {
+                            val goal = TrainingGoal.valueOf(goalName)
+                            val currentState = fsmManager.getCurrentState(userId)
+
+                            errorHandler.withRetry {
+                                profileService.updateGoal(userId, goal)
+                            }
+
+                            if (currentState == UserState.ONBOARDING_GOALS) {
+                                fsmManager.transitionTo(userId, UserState.IDLE)
+                                sendMessage(
+                                    chatId,
+                                    """
+                                    Отлично! Твой профиль создан.
+                                    
+                                    Цель: ${goal.displayName()}
+                                    
+                                    Теперь ты можешь создать свою первую тренировку командой /workout.
+                                    """.trimIndent(),
+                                )
+                            } else if (currentState == UserState.EDIT_GOAL) {
+                                fsmManager.transitionTo(userId, UserState.IDLE)
+                                sendMessage(
+                                    chatId,
+                                    "Цель обновлена: ${goal.displayName()}\n\nИзменения применятся к будущим тренировкам.",
+                                )
+                            }
+                        } catch (e: IllegalArgumentException) {
+                            sendMessage(chatId, "Неверная цель. Попробуй еще раз.")
+                        } catch (e: AppError) {
+                            sendMessage(chatId, errorHandler.toUserMessage(e))
+                        } catch (e: Exception) {
+                            val appError = errorHandler.wrapException(e)
+                            sendMessage(chatId, errorHandler.toUserMessage(appError))
+                        }
+                    }
                 }
                 "schedule" -> {
                     val whenOption = parts.getOrNull(1)

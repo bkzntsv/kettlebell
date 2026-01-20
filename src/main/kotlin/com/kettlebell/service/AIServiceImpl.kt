@@ -275,7 +275,7 @@ class AIServiceImpl(
                   "experience": "${profile.experience.name}",
                   "weight": ${profile.bodyWeight},
                   "gender": "${profile.gender.name}",
-                  "goal": "${profile.goal}"
+                  "goal": "${escapeJsonString(profile.goal.displayName())}"
                 },
                 "equipment": {
                   "available_kettlebells": [${profile.weights.joinToString(", ")}]

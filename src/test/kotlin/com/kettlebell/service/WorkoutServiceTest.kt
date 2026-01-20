@@ -11,6 +11,7 @@ import com.kettlebell.model.Gender
 import com.kettlebell.model.ProfileData
 import com.kettlebell.model.Subscription
 import com.kettlebell.model.SubscriptionType
+import com.kettlebell.model.TrainingGoal
 import com.kettlebell.model.UserMetadata
 import com.kettlebell.model.UserProfile
 import com.kettlebell.model.UserState
@@ -56,7 +57,7 @@ class WorkoutServiceTest : StringSpec({
                         experience = ExperienceLevel.BEGINNER,
                         bodyWeight = 70f,
                         gender = Gender.MALE,
-                        goal = "Build strength",
+                        goal = TrainingGoal.STRENGTH,
                     ),
                 subscription = Subscription(SubscriptionType.FREE, null),
                 metadata = UserMetadata(Instant.now(), Instant.now()),
@@ -117,7 +118,7 @@ class WorkoutServiceTest : StringSpec({
                         experience = ExperienceLevel.BEGINNER,
                         bodyWeight = 70f,
                         gender = Gender.MALE,
-                        goal = "goal",
+                        goal = TrainingGoal.GENERAL_FITNESS,
                     ),
                 subscription = Subscription(SubscriptionType.FREE, null),
                 metadata = UserMetadata(Instant.now(), Instant.now()),
@@ -143,7 +144,7 @@ class WorkoutServiceTest : StringSpec({
                         experience = ExperienceLevel.BEGINNER,
                         bodyWeight = 70f,
                         gender = Gender.MALE,
-                        goal = "goal",
+                        goal = TrainingGoal.GENERAL_FITNESS,
                     ),
                 subscription = Subscription(SubscriptionType.FREE, null),
                 metadata = UserMetadata(Instant.now(), Instant.now()),

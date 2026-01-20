@@ -15,6 +15,7 @@ import com.kettlebell.model.ExercisePerformance
 import com.kettlebell.model.ExperienceLevel
 import com.kettlebell.model.Gender
 import com.kettlebell.model.ProfileData
+import com.kettlebell.model.TrainingGoal
 import com.kettlebell.model.UserState
 import com.kettlebell.model.Workout
 import com.kettlebell.model.WorkoutPlan
@@ -144,7 +145,7 @@ class NegativeScenariosIntegrationTest : StringSpec({
                     experience = ExperienceLevel.AMATEUR,
                     bodyWeight = 80f,
                     gender = Gender.MALE,
-                    goal = "Сила",
+                    goal = TrainingGoal.STRENGTH,
                 ),
             )
             fsmManager.transitionTo(userId, UserState.IDLE)

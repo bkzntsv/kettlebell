@@ -3,17 +3,17 @@ package com.kettlebell.model
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
+import io.kotest.property.arbitrary.enum
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.long
-import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
 import java.time.Instant
 
 class ModelPropertyTest : StringSpec({
 
     "Property 29: Schema Version Presence - UserProfile should always have schemaVersion" {
-        checkAll(100, Arb.long(), Arb.string(), Arb.list(Arb.int(1, 100))) { userId, goal, weights ->
+        checkAll(100, Arb.long(), Arb.enum<TrainingGoal>(), Arb.list(Arb.int(1, 100))) { userId, goal, weights ->
             val profile =
                 UserProfile(
                     id = userId,

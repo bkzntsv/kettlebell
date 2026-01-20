@@ -25,7 +25,7 @@ data class ProfileData(
     val experience: ExperienceLevel,
     val bodyWeight: Float,
     val gender: Gender,
-    val goal: String,
+    val goal: TrainingGoal,
 )
 
 enum class ExperienceLevel {
@@ -38,6 +38,32 @@ enum class Gender {
     MALE,
     FEMALE,
     OTHER,
+}
+
+enum class TrainingGoal {
+    STRENGTH,
+    ENDURANCE,
+    WEIGHT_LOSS,
+    GENERAL_FITNESS,
+    ;
+
+    fun displayName(): String {
+        return when (this) {
+            STRENGTH -> "Сила и мощность"
+            ENDURANCE -> "Выносливость"
+            WEIGHT_LOSS -> "Похудение"
+            GENERAL_FITNESS -> "Общая физическая подготовка"
+        }
+    }
+
+    fun displayNameWithDescription(): String {
+        return when (this) {
+            STRENGTH -> "💪 Сила и мощность"
+            ENDURANCE -> "🏃 Выносливость"
+            WEIGHT_LOSS -> "⚖️ Похудение"
+            GENERAL_FITNESS -> "🎯 Общая физическая подготовка"
+        }
+    }
 }
 
 data class Subscription(

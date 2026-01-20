@@ -15,6 +15,7 @@ import com.kettlebell.model.ExercisePerformance
 import com.kettlebell.model.ExperienceLevel
 import com.kettlebell.model.Gender
 import com.kettlebell.model.ProfileData
+import com.kettlebell.model.TrainingGoal
 import com.kettlebell.model.UserState
 import com.kettlebell.model.Workout
 import com.kettlebell.model.WorkoutPlan
@@ -144,7 +145,7 @@ class NegativeScenariosIntegrationTest : StringSpec({
                     experience = ExperienceLevel.AMATEUR,
                     bodyWeight = 80f,
                     gender = Gender.MALE,
-                    goal = "Сила",
+                    goal = TrainingGoal.STRENGTH,
                 ),
             )
             fsmManager.transitionTo(userId, UserState.IDLE)
@@ -308,7 +309,10 @@ class NegativeScenariosIntegrationTest : StringSpec({
         runBlocking {
             val userId = 99904L
             // Создаем профиль и тренировку в статусе ожидания фидбека
-            profileService.createProfile(userId, ProfileData(listOf(16), ExperienceLevel.BEGINNER, 70f, Gender.MALE, "Goal"))
+            profileService.createProfile(
+                userId,
+                ProfileData(listOf(16), ExperienceLevel.BEGINNER, 70f, Gender.MALE, TrainingGoal.GENERAL_FITNESS),
+            )
             val plan = WorkoutPlan("Warmup", listOf(Exercise("Swing", 16, 10, 3, null, null)), "Cooldown")
 
             // Создаем напрямую в репозитории для скорости
@@ -356,7 +360,10 @@ class NegativeScenariosIntegrationTest : StringSpec({
         runBlocking {
             val userId = 99905L
             // Создаем профиль и тренировку
-            profileService.createProfile(userId, ProfileData(listOf(16), ExperienceLevel.BEGINNER, 70f, Gender.MALE, "Goal"))
+            profileService.createProfile(
+                userId,
+                ProfileData(listOf(16), ExperienceLevel.BEGINNER, 70f, Gender.MALE, TrainingGoal.GENERAL_FITNESS),
+            )
             val plan = WorkoutPlan("Warmup", listOf(Exercise("Swing", 16, 10, 3, null, null)), "Cooldown")
 
             val wId = java.util.UUID.randomUUID().toString()

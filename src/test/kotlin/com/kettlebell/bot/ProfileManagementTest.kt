@@ -5,6 +5,7 @@ import com.kettlebell.model.Gender
 import com.kettlebell.model.ProfileData
 import com.kettlebell.model.Subscription
 import com.kettlebell.model.SubscriptionType
+import com.kettlebell.model.TrainingGoal
 import com.kettlebell.model.UserMetadata
 import com.kettlebell.model.UserProfile
 import com.kettlebell.model.UserState
@@ -17,14 +18,13 @@ import io.kotest.property.arbitrary.float
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.long
-import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
 import java.time.Instant
 
 class ProfileManagementTest : StringSpec({
 
     "should display profile with all required information" {
-        checkAll(100, Arb.long(), Arb.list(Arb.int(1, 100), 1..5), Arb.string(), Arb.float(40f, 150f)) {
+        checkAll(100, Arb.long(), Arb.list(Arb.int(1, 100), 1..5), Arb.enum<TrainingGoal>(), Arb.float(40f, 150f)) {
                 userId, weights, goal, bodyWeight ->
             val profile =
                 UserProfile(
@@ -78,9 +78,10 @@ class ProfileManagementTest : StringSpec({
     }
 
     "should handle goal update" {
-        checkAll(100, Arb.string(1..500)) { goal ->
-            // Goal should be non-empty string
-            goal.isNotEmpty() shouldBe true
+        checkAll(100, Arb.enum<TrainingGoal>()) { goal ->
+            // Goal should be a valid enum value
+            goal shouldNotBe null
+            goal.displayName().isNotEmpty() shouldBe true
         }
     }
 })

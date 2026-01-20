@@ -5,6 +5,7 @@ import com.kettlebell.model.Gender
 import com.kettlebell.model.ProfileData
 import com.kettlebell.model.Subscription
 import com.kettlebell.model.SubscriptionType
+import com.kettlebell.model.TrainingGoal
 import com.kettlebell.model.UserMetadata
 import com.kettlebell.model.UserProfile
 import com.kettlebell.model.UserScheduling
@@ -42,7 +43,7 @@ class ProfileServiceImpl(
                 experience = ExperienceLevel.BEGINNER,
                 bodyWeight = 0f,
                 gender = Gender.OTHER,
-                goal = "",
+                goal = TrainingGoal.GENERAL_FITNESS,
             )
 
         val profile =
@@ -94,7 +95,7 @@ class ProfileServiceImpl(
 
     override suspend fun updateGoal(
         userId: Long,
-        goal: String,
+        goal: TrainingGoal,
     ): UserProfile {
         val profile = userRepository.findById(userId) ?: throw IllegalStateException("Profile not found")
         val updatedProfile =

@@ -1,6 +1,7 @@
 package com.kettlebell.integration
 
 import com.kettlebell.bot.TelegramBotHandler
+import com.kettlebell.bot.TelegramCallbackQuery
 import com.kettlebell.bot.TelegramChat
 import com.kettlebell.bot.TelegramMessage
 import com.kettlebell.bot.TelegramUpdate
@@ -10,6 +11,7 @@ import com.kettlebell.error.ErrorHandler
 import com.kettlebell.model.ExperienceLevel
 import com.kettlebell.model.Gender
 import com.kettlebell.model.SubscriptionType
+import com.kettlebell.model.TrainingGoal
 import com.kettlebell.model.UserState
 import com.kettlebell.repository.MongoUserRepository
 import com.kettlebell.repository.MongoWorkoutRepository
@@ -168,23 +170,29 @@ class OnboardingFlowIntegrationTest : StringSpec({
             profileAfterPersonal!!.profile.bodyWeight shouldBe 75.5f
             profileAfterPersonal.profile.gender shouldBe Gender.MALE
 
-            // Step 6: User provides goal
+            // Step 6: User selects goal via callback button
             val goalUpdate =
                 TelegramUpdate(
                     update_id = 6,
-                    message =
-                        TelegramMessage(
-                            message_id = 6,
+                    callback_query =
+                        TelegramCallbackQuery(
+                            id = "callback_6",
                             from = TelegramUser(id = userId, first_name = "Test", username = "testuser"),
-                            chat = TelegramChat(id = userId, type = "private"),
-                            text = "Набрать мышечную массу и улучшить выносливость",
+                            message =
+                                TelegramMessage(
+                                    message_id = 5,
+                                    from = TelegramUser(id = 1L, first_name = "Bot", username = "bot"),
+                                    chat = TelegramChat(id = userId, type = "private"),
+                                    text = "Выбери свою цель тренировок:",
+                                ),
+                            data = "select_goal:${TrainingGoal.GENERAL_FITNESS.name}",
                         ),
                 )
             botHandler.handleUpdate(goalUpdate)
 
             // Verify: Goal saved and state returns to IDLE
             val finalProfile = profileService.getProfile(userId)
-            finalProfile!!.profile.goal shouldBe "Набрать мышечную массу и улучшить выносливость"
+            finalProfile!!.profile.goal shouldBe TrainingGoal.GENERAL_FITNESS
             finalProfile.fsmState shouldBe UserState.IDLE
 
             // Verify: Complete profile is saved correctly

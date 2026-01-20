@@ -3,6 +3,7 @@ package com.kettlebell.service
 import com.kettlebell.model.ExperienceLevel
 import com.kettlebell.model.Gender
 import com.kettlebell.model.ProfileData
+import com.kettlebell.model.TrainingGoal
 import com.kettlebell.model.UserProfile
 
 interface ProfileService {
@@ -28,7 +29,7 @@ interface ProfileService {
 
     suspend fun updateGoal(
         userId: Long,
-        goal: String,
+        goal: TrainingGoal,
     ): UserProfile
 
     suspend fun updateExperience(

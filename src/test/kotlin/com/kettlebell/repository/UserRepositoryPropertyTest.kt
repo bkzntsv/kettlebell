@@ -5,6 +5,7 @@ import com.kettlebell.model.Gender
 import com.kettlebell.model.ProfileData
 import com.kettlebell.model.Subscription
 import com.kettlebell.model.SubscriptionType
+import com.kettlebell.model.TrainingGoal
 import com.kettlebell.model.UserMetadata
 import com.kettlebell.model.UserProfile
 import com.kettlebell.model.UserState
@@ -15,7 +16,6 @@ import io.kotest.property.arbitrary.enum
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.long
-import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -28,7 +28,7 @@ class UserRepositoryPropertyTest : StringSpec({
     val userRepository = mockk<UserRepository>()
 
     "Property 19: Profile Update Persistence - updated profile should be saved and retrievable" {
-        checkAll(100, Arb.long(), Arb.list(Arb.int(1, 100)), Arb.string()) { userId, weights, goal ->
+        checkAll(100, Arb.long(), Arb.list(Arb.int(1, 100)), Arb.enum<TrainingGoal>()) { userId, weights, goal ->
             val originalProfile =
                 UserProfile(
                     id = userId,
@@ -39,7 +39,7 @@ class UserRepositoryPropertyTest : StringSpec({
                             experience = ExperienceLevel.BEGINNER,
                             bodyWeight = 70f,
                             gender = Gender.MALE,
-                            goal = "old goal",
+                            goal = TrainingGoal.STRENGTH,
                         ),
                     subscription = Subscription(SubscriptionType.FREE, null),
                     metadata = UserMetadata(Instant.now(), Instant.now()),
@@ -83,7 +83,7 @@ class UserRepositoryPropertyTest : StringSpec({
                             experience = ExperienceLevel.BEGINNER,
                             bodyWeight = 70f,
                             gender = Gender.MALE,
-                            goal = "goal",
+                            goal = TrainingGoal.GENERAL_FITNESS,
                         ),
                     subscription = Subscription(SubscriptionType.FREE, null),
                     metadata = UserMetadata(Instant.now(), Instant.now()),

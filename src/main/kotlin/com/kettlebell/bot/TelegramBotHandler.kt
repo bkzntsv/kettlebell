@@ -150,6 +150,21 @@ class TelegramBotHandler(
 
     suspend fun startPolling() {
         logger.info("Starting Telegram Bot in POLLING mode...")
+        
+        // Удаляем webhook перед запуском polling, чтобы избежать конфликта 409
+        try {
+            val deleteWebhookResponse = httpClient.post("$telegramApiUrl/deleteWebhook") {
+                parameter("drop_pending_updates", true)
+            }
+            if (deleteWebhookResponse.status.isSuccess()) {
+                logger.info("Webhook successfully deleted")
+            } else {
+                logger.warn("Failed to delete webhook: ${deleteWebhookResponse.status}")
+            }
+        } catch (e: Exception) {
+            logger.warn("Error deleting webhook (may not be set): ${e.message}")
+        }
+        
         var offset = 0L
 
         while (scope.isActive) {
@@ -415,6 +430,9 @@ class TelegramBotHandler(
                             append(" (Работа: ${ex.timeWork}с, Отдых: ${ex.timeRest}с)")
                         }
                         appendLine()
+                        ex.coachingTips?.takeIf { it.isNotBlank() }?.let { tips ->
+                            appendLine("   💡 $tips")
+                        }
                     }
                     appendLine()
                     appendLine("Заминка:")
@@ -559,13 +577,6 @@ class TelegramBotHandler(
                     // Add recovery status if available
                     performance?.recoveryStatus?.takeIf { it.isNotBlank() }?.let { status ->
                         appendLine("Статус восстановления: $status")
-                    }
-
-                    // Add technical notes if available
-                    performance?.technicalNotes?.takeIf { it.isNotBlank() }?.let { notes ->
-                        appendLine()
-                        appendLine("📝 Технические заметки:")
-                        appendLine(notes)
                     }
 
                     // Add issues/red flags if any

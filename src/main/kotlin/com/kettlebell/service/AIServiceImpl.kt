@@ -162,18 +162,77 @@ class AIServiceImpl(
                 .take(3)
                 .joinToString(",\n") { workout ->
                     val perf = workout.actualPerformance!!
-                    val exercisesStr =
-                        perf.data.joinToString(", ") { ex ->
-                            "${ex.name} (${ex.weight}kg)"
+                    val plan = workout.plan
+                    
+                    // Calculate total volume
+                    val totalVolume = perf.data.sumOf { ex ->
+                        if (ex.weight > 0 && ex.reps > 0 && ex.sets > 0) {
+                            ex.weight * ex.reps * ex.sets
+                        } else {
+                            0
                         }
+                    }
+                    
+                    // Build detailed exercises list with plan vs actual comparison
+                    val exercisesDetail = perf.data.mapIndexed { index, actual ->
+                        val planned = plan.exercises.getOrNull(index)
+                        val plannedWeight = planned?.weight ?: 0
+                        val plannedReps = planned?.reps
+                        val plannedSets = planned?.sets
+                        val plannedTimeWork = planned?.timeWork
+                        val plannedTimeRest = planned?.timeRest
+                        
+                        val statusInfo = if (actual.completed) {
+                            if (actual.status == "completed") "completed" else actual.status ?: "completed"
+                        } else {
+                            actual.status ?: "failed"
+                        }
+                        
+                        val nameEscaped = actual.name.replace("\"", "\\\"")
+                        
+                        """
+                        {
+                          "name": "$nameEscaped",
+                          "planned_weight_kg": $plannedWeight,
+                          "planned_reps": ${plannedReps ?: "null"},
+                          "planned_sets": ${plannedSets ?: "null"},
+                          "planned_time_work_sec": ${plannedTimeWork ?: "null"},
+                          "planned_time_rest_sec": ${plannedTimeRest ?: "null"},
+                          "actual_weight_kg": ${actual.weight},
+                          "actual_reps": ${actual.reps},
+                          "actual_sets": ${actual.sets},
+                          "status": "$statusInfo"
+                        }""".trimIndent()
+                    }.joinToString(",\n")
+                    
                     val issuesStr = if (perf.issues.isNotEmpty()) perf.issues.joinToString("\", \"", "\"", "\"") else ""
+                    val technicalNotes = perf.technicalNotes?.takeIf { it.isNotBlank() }?.replace("\"", "\\\"") ?: ""
+                    val recoveryStatus = perf.recoveryStatus?.takeIf { it.isNotBlank() }?.replace("\"", "\\\"") ?: ""
+                    
+                    // Build planned exercises summary
+                    val plannedExercisesStr = plan.exercises.joinToString(", ") { ex ->
+                        val repsSets = if (ex.reps != null && ex.sets != null) {
+                            "${ex.reps}x${ex.sets}"
+                        } else if (ex.timeWork != null && ex.timeRest != null) {
+                            "${ex.timeWork}s/${ex.timeRest}s"
+                        } else {
+                            ""
+                        }
+                        "${ex.name.replace("\"", "\\\"")} ${ex.weight}kg $repsSets".trim()
+                    }
 
                     """
                     {
                       "date": "${workout.timing.completedAt}",
-                      "exercises": "$exercisesStr",
+                      "planned_exercises": "$plannedExercisesStr",
+                      "exercises": [
+                        $exercisesDetail
+                      ],
+                      "total_volume_kg": $totalVolume,
                       "rpe": ${perf.rpe ?: "null"},
-                      "red_flags": [${if (perf.issues.isNotEmpty()) issuesStr else ""}]
+                      "recovery_status": ${if (recoveryStatus.isNotEmpty()) "\"$recoveryStatus\"" else "null"},
+                      "red_flags": [${if (perf.issues.isNotEmpty()) issuesStr else ""}],
+                      "technical_notes": ${if (technicalNotes.isNotEmpty()) "\"$technicalNotes\"" else "null"}
                     }
                     """.trimIndent()
                 }
@@ -196,7 +255,7 @@ class AIServiceImpl(
                 "current_week": ${context.trainingWeek},
                 "is_deload": ${context.suggestDeload} 
               },
-              "instructions": "Создай персонализированный план. Если is_deload = true, снизь объем на 40% и сфокусируйся на мобильности. Используй ТОЛЬКО веса из available_kettlebells. Добавь краткие рекомендации по технике (coaching_tips) для каждого упражнения."
+              "instructions": "Create a personalized workout plan aligned with the athlete's goal. If is_deload = true, reduce volume by 40% and focus on mobility. CRITICAL: Use ONLY weights from available_kettlebells - never suggest intermediate weights. If a weight seems too heavy, adjust reps/sets/tempo instead. Add brief technique tips (coaching_tips) for each exercise. Keep warmup and cooldown short, simple, and varied. IMPORTANT: Analyze workout history carefully - compare planned vs actual performance to understand athlete's capabilities. Use total_volume_kg, RPE, recovery_status, and exercise completion status to adjust progression. Pay attention to technical_notes and red_flags to address issues. If athlete consistently fails to complete planned reps/sets, reduce volume or adjust intensity. If athlete easily completes all sets with low RPE, gradually increase volume or intensity."
             }
             """.trimIndent()
     }
@@ -411,50 +470,67 @@ class AIServiceImpl(
 
     companion object {
         private const val SYSTEM_PROMPT_WORKOUT_GENERATION = """
-            Вы — элитный тренер по гиревому спорту (система StrongFirst/Hardstyle). Ваша цель — создавать безопасные, высокоэффективные программы, используя доказательные методики: периодизацию, управление RPE и баланс паттернов движения.
-            Ваши принципы:
-            Баланс паттернов: Каждая тренировка должна включать: Hip Hinge (махи/тяги), Squat (приседы), Push (жимы), Pull (тяги в наклоне).
-            Управление весом: Если доступный вес гири слишком велик для повторений, используйте методы деградации (снижение темпа, эксцентрические фазы). Если мал — увеличивайте плотность (EMOM) или время под нагрузкой.
-            Прогрессия: Анализируйте историю. Если прошлая тренировка была успешной, увеличивайте объем (+1-2 повторения или +1 подход), а не только вес.
-            Безопасность: Для новичков исключите сложные рывки. Фокус на стабильности плеча и нейтральной спине.
+            You are an elite kettlebell coach (StrongFirst/Hardstyle system). Your primary goal is to be an effective coach helping the athlete achieve their specific training goal. Create safe, highly effective programs using evidence-based methods: periodization, RPE management, and intelligent exercise selection.
             
-            КРИТИЧЕСКИ ВАЖНО: Ответ ТОЛЬКО в формате JSON, без дополнительного текста. Структура:
+            Your principles:
+            Goal-oriented training: Design workouts that directly support the athlete's stated goal. Analyze their training history and adapt exercises, volume, and intensity accordingly. Don't rigidly force specific movement patterns - choose exercises that best serve the athlete's progress toward their goal.
+            Weight management: The athlete only has specific kettlebells available. You MUST use ONLY weights from the available_kettlebells list. NEVER suggest reducing weight by a few kilograms - if a weight is too heavy, use intensity techniques (slower tempo, eccentric phases, fewer reps) or density methods (EMOM, time under tension). If a weight is too light, increase density or volume.
+            Progression: Analyze training history. If the previous workout was successful, gradually increase volume (+1-2 reps or +1 set) rather than just weight. Adapt based on RPE and recovery status.
+            Safety: For beginners, avoid complex snatches. Focus on shoulder stability and neutral spine. Pay attention to red flags from previous workouts.
+            
+            Warmup and cooldown:
+            - Keep them SHORT and SIMPLE (2-3 exercises max, 1-2 sentences each)
+            - Use PLAIN, accessible language - avoid complex technical terms
+            - Vary exercises between workouts to keep it fresh
+            - Warmup: Focus on mobility and activation relevant to the main workout
+            - Cooldown: Focus on gentle stretching and recovery
+            
+            LANGUAGE: All text content in your response (warmup, exercise names, coaching_tips, cooldown) must be in RUSSIAN. This is the default language for user communication. The prompt is in English for clarity, but your output must always be in Russian.
+            
+            CRITICALLY IMPORTANT: Response ONLY in JSON format, no additional text. Structure:
             {
-              "warmup": "текст разминки",
+              "warmup": "brief warmup text in Russian (2-3 exercises, simple language)",
               "exercises": [
                 {
-                  "name": "название упражнения",
-                  "weight": число_в_кг,
-                  "reps": число_повторов_или_null,
-                  "sets": число_подходов_или_null,
-                  "timeWork": секунды_работы_или_null,
-                  "timeRest": секунды_отдыха_или_null,
-                  "coaching_tips": "совет по технике"
+                  "name": "exercise name in Russian",
+                  "weight": number_in_kg (MUST be from available_kettlebells list),
+                  "reps": number_of_reps_or_null,
+                  "sets": number_of_sets_or_null,
+                  "timeWork": seconds_of_work_or_null,
+                  "timeRest": seconds_of_rest_or_null,
+                  "coaching_tips": "brief technique tip in Russian"
                 }
               ],
-              "cooldown": "текст заминки"
+              "cooldown": "brief cooldown text in Russian (2-3 exercises, simple language)"
             }
-            Язык — РУССКИЙ.
         """
 
         private const val SYSTEM_PROMPT_FEEDBACK_ANALYSIS = """
-            Вы — аналитик спортивных данных и опытный тренер (StrongFirst).
-            Ваша задача:
-            1. Перевести свободный отзыв атлета в структурированные метрики.
-            2. Сгенерировать ответ тренера ("coach_feedback").
+            You are a sports data analyst and experienced coach (StrongFirst).
+            Your tasks:
+            1. Translate the athlete's free-form feedback into structured metrics.
+            2. Generate the coach's response ("coach_feedback").
             
-            Тон ответа тренера: Адаптируйся под стиль общения пользователя. Будь живым и человечным.
-            - Если пользователь пишет кратко и сухо — отвечай так же четко и по делу.
-            - Если пользователь эмоционален, шутит или использует сленг — поддержи этот тон, но оставайся в роли тренера.
-            - Реагируй на контекст: подбадривай при успехах, сочувствуй при усталости, но всегда направляй к цели.
-            - Если есть травма/боль: прояви заботу и профессиональную осторожность.
+            Coach feedback tone: Adapt to the user's communication style. Be lively and human.
+            - If the user writes briefly and dryly — respond equally clearly and to the point.
+            - If the user is emotional, jokes, or uses slang — match that tone, but remain in the coach role.
+            - React to context: encourage successes, empathize with fatigue, but always guide toward the goal.
+            - If there's injury/pain: show care and professional caution.
             
-            Критически важно для аналитики:
-            Выявляйте маркеры боли (поясница, локти, плечи).
-            Оценивайте "Technical Failure" (если пользователь пишет, что 'техника поплыла').
-            Сравнивайте план и факт. Если количество повторений меньше плана — фиксируйте недобор.
-            Определяйте RPE (шкала 1-10) на основе эмоционального окраса текста, если число не указано явно.
-            Ответ ТОЛЬКО в JSON.
+            CRITICAL RULES FOR COACH FEEDBACK:
+            - NEVER ask questions to the user
+            - NEVER suggest the user to write or contact you
+            - Provide a complete, self-contained response - a statement or comment from the coach
+            - The feedback should be a closing remark, not an invitation for further conversation
+            - All feedback must be in RUSSIAN (default user language)
+            
+            Critical for analytics:
+            Identify pain markers (lower back, elbows, shoulders).
+            Assess "Technical Failure" (if user writes that 'technique broke down').
+            Compare plan vs actual. If reps are less than planned — record shortfall.
+            Determine RPE (scale 1-10) based on emotional tone if number not explicitly stated.
+            
+            Response ONLY in JSON format.
         """
     }
 }

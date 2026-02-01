@@ -3,11 +3,13 @@ package com.kettlebell.bot
 import com.kettlebell.config.AppConfig
 import com.kettlebell.error.AppError
 import com.kettlebell.error.ErrorHandler
+import com.kettlebell.model.EventType
 import com.kettlebell.model.ExperienceLevel
 import com.kettlebell.model.Gender
 import com.kettlebell.model.TrainingGoal
 import com.kettlebell.model.UserState
 import com.kettlebell.service.AIService
+import com.kettlebell.service.AnalyticsService
 import com.kettlebell.service.FSMManager
 import com.kettlebell.service.ProfileService
 import com.kettlebell.service.WorkoutService
@@ -120,6 +122,7 @@ class TelegramBotHandler(
     private val profileService: ProfileService,
     private val workoutService: WorkoutService,
     private val aiService: AIService,
+    private val analyticsService: AnalyticsService,
     private val errorHandler: ErrorHandler,
     private val httpClient: HttpClient =
         HttpClient(CIO) {
@@ -235,29 +238,46 @@ class TelegramBotHandler(
         val userId = message.from.id
 
         when {
-            text.startsWith("/") -> handleCommand(userId, chatId, text)
+            text.startsWith("/") -> handleCommand(message.from, chatId, text)
             else -> handleStateMessage(userId, chatId, text)
         }
     }
 
     private suspend fun handleCommand(
-        userId: Long,
+        user: TelegramUser,
         chatId: Long,
         command: String,
     ) {
+        val userId = user.id
         val parts = command.split(" ", limit = 2)
         val cmd = parts[0].lowercase()
         // val args = parts.getOrNull(1) ?: ""
 
+        analyticsService.track(userId, EventType.COMMAND, cmd)
+
         when (cmd) {
-            "/start" -> handleStartCommand(userId, chatId)
+            "/start" -> handleStartCommand(user, chatId)
             "/help" -> handleHelpCommand(chatId)
             "/profile" -> handleProfileCommand(userId, chatId)
             "/workout" -> handleWorkoutCommand(userId, chatId)
             "/schedule" -> handleScheduleCommand(userId, chatId)
             "/history" -> handleHistoryCommand(userId, chatId)
             "/reset" -> handleResetCommand(userId, chatId)
+            "/admin" -> handleAdminCommand(userId, chatId)
             else -> sendMessage(chatId, "Неизвестная команда. Используйте /help для списка команд.")
+        }
+    }
+
+    private suspend fun handleAdminCommand(
+        userId: Long,
+        chatId: Long,
+    ) {
+        if (config.adminUserId != null && userId == config.adminUserId) {
+            val report = analyticsService.getDailyReport()
+            sendMessage(chatId, report)
+        } else {
+            // Pretend command doesn't exist
+            sendMessage(chatId, "Неизвестная команда. Используйте /help для списка команд.")
         }
     }
 
@@ -283,14 +303,19 @@ class TelegramBotHandler(
     }
 
     private suspend fun handleStartCommand(
-        userId: Long,
+        user: TelegramUser,
         chatId: Long,
     ) {
+        val userId = user.id
         val profile = profileService.getProfile(userId)
 
         if (profile == null) {
             profileService.initProfile(userId)
             fsmManager.transitionTo(userId, UserState.ONBOARDING_MEDICAL_CONFIRM)
+
+            // Notify admin about new user
+            notifyAdminNewUser(user)
+
             sendMessage(
                 chatId,
                 """
@@ -948,6 +973,8 @@ class TelegramBotHandler(
         val action = parts[0]
         val workoutId = parts.getOrNull(1)
 
+        analyticsService.track(userId, EventType.ACTION, action)
+
         try {
             when (action) {
                 "start_workout" -> {
@@ -1197,6 +1224,20 @@ class TelegramBotHandler(
             }
         } catch (e: Exception) {
             logger.error("Error checking reminders", e)
+        }
+    }
+
+    private suspend fun notifyAdminNewUser(user: TelegramUser) {
+        val adminId = config.adminUserId ?: return
+        if (user.id == adminId) return // Don't notify about self
+
+        val username = user.username?.let { "@$it" } ?: "без юзернейма"
+        val text = "🔔 **Новый пользователь!**\n\nИмя: ${user.first_name}\nНик: $username\nID: ${user.id}"
+
+        try {
+            sendMessage(adminId, text)
+        } catch (e: Exception) {
+            logger.error("Failed to notify admin about new user", e)
         }
     }
 

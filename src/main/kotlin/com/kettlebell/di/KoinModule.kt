@@ -11,6 +11,7 @@ import com.kettlebell.repository.UserRepository
 import com.kettlebell.repository.WorkoutRepository
 import com.kettlebell.service.AIService
 import com.kettlebell.service.AIServiceImpl
+import com.kettlebell.service.AnalyticsService
 import com.kettlebell.service.FSMManager
 import com.kettlebell.service.ProfileService
 import com.kettlebell.service.ProfileServiceImpl
@@ -48,7 +49,9 @@ fun appModule(environment: ApplicationEnvironment) =
 
         single<AIService> { AIServiceImpl(get(), get()) }
 
-        single { FSMManager(get()) }
+        single { AnalyticsService(get()) }
+
+        single { FSMManager(get(), get()) }
 
         single<ProfileService> { ProfileServiceImpl(get()) }
 
@@ -70,6 +73,7 @@ fun appModule(environment: ApplicationEnvironment) =
                 profileService = get(),
                 workoutService = get(),
                 aiService = get(),
+                analyticsService = get(),
                 errorHandler = get(),
             )
         }

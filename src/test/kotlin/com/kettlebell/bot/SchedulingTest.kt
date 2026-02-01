@@ -9,6 +9,7 @@ import com.kettlebell.model.WorkoutPlan
 import com.kettlebell.model.WorkoutStatus
 import com.kettlebell.model.WorkoutTiming
 import com.kettlebell.service.AIService
+import com.kettlebell.service.AnalyticsService
 import com.kettlebell.service.FSMManager
 import com.kettlebell.service.ProfileService
 import com.kettlebell.service.WorkoutService
@@ -34,6 +35,7 @@ class SchedulingTest {
     private val profileService = mockk<ProfileService>(relaxed = true)
     private val workoutService = mockk<WorkoutService>(relaxed = true)
     private val aiService = mockk<AIService>(relaxed = true)
+    private val analyticsService = mockk<AnalyticsService>(relaxed = true)
     private val errorHandler = ErrorHandler()
 
     private lateinit var botHandler: TelegramBotHandler
@@ -62,6 +64,7 @@ class SchedulingTest {
                 profileService,
                 workoutService,
                 aiService,
+                analyticsService,
                 errorHandler,
                 mockHttpClient,
             )

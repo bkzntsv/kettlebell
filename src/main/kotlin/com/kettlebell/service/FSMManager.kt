@@ -1,10 +1,12 @@
 package com.kettlebell.service
 
+import com.kettlebell.model.EventType
 import com.kettlebell.model.UserState
 import com.kettlebell.repository.UserRepository
 
 class FSMManager(
     private val userRepository: UserRepository,
+    private val analyticsService: AnalyticsService,
 ) {
     suspend fun getCurrentState(userId: Long): UserState {
         val profile = userRepository.findById(userId)
@@ -15,7 +17,17 @@ class FSMManager(
         userId: Long,
         newState: UserState,
     ) {
+        val oldState = getCurrentState(userId)
         userRepository.updateState(userId, newState)
+
+        if (oldState != newState) {
+            analyticsService.track(
+                userId,
+                EventType.STATE_CHANGE,
+                "${oldState.name} -> ${newState.name}",
+                mapOf("from" to oldState.name, "to" to newState.name),
+            )
+        }
     }
 
     // Validates if transition is allowed

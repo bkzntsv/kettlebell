@@ -9,6 +9,7 @@ data class AppConfig(
     val mongodbDatabaseName: String,
     val freeMonthlyLimit: Int,
     val botMode: String = "webhook",
+    val adminUserId: Long? = null,
 ) {
     companion object {
         fun create(environment: ApplicationEnvironment): AppConfig {
@@ -19,6 +20,7 @@ data class AppConfig(
                 mongodbDatabaseName = environment.config.property("environment.mongodb.database.name").getString(),
                 freeMonthlyLimit = environment.config.property("environment.subscription.free.monthly.limit").getString().toInt(),
                 botMode = environment.config.propertyOrNull("environment.bot.mode")?.getString() ?: "webhook",
+                adminUserId = environment.config.propertyOrNull("environment.admin.user.id")?.getString()?.toLongOrNull(),
             )
         }
     }

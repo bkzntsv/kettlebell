@@ -23,6 +23,7 @@ import com.kettlebell.repository.MongoWorkoutRepository
 import com.kettlebell.repository.UserRepository
 import com.kettlebell.repository.WorkoutRepository
 import com.kettlebell.service.AIService
+import com.kettlebell.service.AnalyticsService
 import com.kettlebell.service.FSMManager
 import com.kettlebell.service.ProfileService
 import com.kettlebell.service.ProfileServiceImpl
@@ -58,6 +59,7 @@ class WorkoutFlowIntegrationTest : StringSpec({
     lateinit var fsmManager: FSMManager
     lateinit var botHandler: TelegramBotHandler
     lateinit var aiService: AIService
+    lateinit var analyticsService: AnalyticsService
     val userId = 67890L
 
     beforeSpec {
@@ -71,6 +73,7 @@ class WorkoutFlowIntegrationTest : StringSpec({
         workoutRepository = MongoWorkoutRepository(database)
 
         aiService = mockk<AIService>()
+        analyticsService = mockk<AnalyticsService>(relaxed = true)
         val config =
             AppConfig(
                 telegramBotToken = "test_token",
@@ -80,7 +83,7 @@ class WorkoutFlowIntegrationTest : StringSpec({
                 freeMonthlyLimit = 10,
             )
 
-        fsmManager = FSMManager(userRepository)
+        fsmManager = FSMManager(userRepository, analyticsService)
         profileService = ProfileServiceImpl(userRepository)
         workoutService = WorkoutServiceImpl(workoutRepository, userRepository, aiService, config)
         val errorHandler = ErrorHandler()
@@ -106,6 +109,7 @@ class WorkoutFlowIntegrationTest : StringSpec({
                 profileService = profileService,
                 workoutService = workoutService,
                 aiService = aiService,
+                analyticsService = analyticsService,
                 errorHandler = errorHandler,
                 httpClient = mockHttpClient,
             )

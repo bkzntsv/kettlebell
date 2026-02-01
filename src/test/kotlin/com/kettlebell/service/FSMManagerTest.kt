@@ -10,7 +10,8 @@ import io.mockk.mockk
 
 class FSMManagerTest : StringSpec({
     val userRepository = mockk<UserRepository>()
-    val fsmManager = FSMManager(userRepository)
+    val analyticsService = mockk<AnalyticsService>(relaxed = true)
+    val fsmManager = FSMManager(userRepository, analyticsService)
 
     "should allow valid onboarding flow transitions" {
         fsmManager.canTransition(UserState.IDLE, UserState.ONBOARDING_MEDICAL_CONFIRM) shouldBe true

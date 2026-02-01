@@ -21,7 +21,8 @@ import java.time.Instant
 class FSMManagerPropertyTest : StringSpec({
 
     val userRepository = mockk<UserRepository>()
-    val fsmManager = FSMManager(userRepository)
+    val analyticsService = mockk<AnalyticsService>(relaxed = true)
+    val fsmManager = FSMManager(userRepository, analyticsService)
 
     "Property 8: FSM State Transition on Workout Completion - should transition from WORKOUT_IN_PROGRESS to WORKOUT_FEEDBACK_PENDING" {
         val userId = 123L

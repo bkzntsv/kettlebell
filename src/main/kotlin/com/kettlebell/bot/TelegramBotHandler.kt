@@ -154,6 +154,7 @@ class TelegramBotHandler(
 
     suspend fun startPolling() {
         logger.info("Starting Telegram Bot in POLLING mode...")
+        logger.info("Admin User ID: ${config.adminUserId}")
 
         // Удаляем webhook перед запуском polling, чтобы избежать конфликта 409
         try {
@@ -276,6 +277,7 @@ class TelegramBotHandler(
             val report = analyticsService.getDailyReport()
             sendMessage(chatId, report)
         } else {
+            logger.warn("Unauthorized admin attempt. User: $userId, Configured Admin: ${config.adminUserId}")
             // Pretend command doesn't exist
             sendMessage(chatId, "Неизвестная команда. Используйте /help для списка команд.")
         }

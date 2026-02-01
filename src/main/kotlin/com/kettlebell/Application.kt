@@ -73,6 +73,7 @@ fun Application.module() {
                 }
 
                 val updateJson = call.receiveText()
+                logger.info("Received webhook update")
                 val update = json.decodeFromString<TelegramUpdate>(updateJson)
 
                 launch {

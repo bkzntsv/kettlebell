@@ -190,7 +190,9 @@ class WorkoutServiceImpl(
                 // Count volume if exercise has valid data (weight > 0, reps > 0, sets > 0)
                 // We count partial completions too, not just fully completed
                 if (ex.weight > 0 && ex.reps > 0 && ex.sets > 0) {
-                    ex.weight * ex.reps * ex.sets
+                    val isDouble = isDoubleKettlebellExercise(ex.name)
+                    val weight = if (isDouble) ex.weight * 2 else ex.weight
+                    weight * ex.reps * ex.sets
                 } else {
                     0
                 }
@@ -209,6 +211,16 @@ class WorkoutServiceImpl(
         }
 
         return volume
+    }
+
+    private fun isDoubleKettlebellExercise(name: String): Boolean {
+        val lowerName = name.lowercase()
+        return lowerName.contains("double") ||
+            lowerName.contains("двойн") ||
+            lowerName.contains("two") ||
+            lowerName.contains("две") ||
+            lowerName.contains("2x") ||
+            lowerName.contains("2х") // Cyrillic x
     }
 
     private suspend fun shouldSuggestDeload(recentWorkouts: List<Workout>): Boolean {

@@ -7,12 +7,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.litote.kmongo.coroutine.CoroutineDatabase
 import org.litote.kmongo.gte
+import org.slf4j.LoggerFactory
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 class AnalyticsService(
     database: CoroutineDatabase,
 ) {
+    private val logger = LoggerFactory.getLogger(AnalyticsService::class.java)
     private val collection = database.getCollection<AnalyticsEvent>("analytics_events")
     private val scope = CoroutineScope(Dispatchers.IO)
 
@@ -34,7 +36,7 @@ class AnalyticsService(
                 )
             } catch (e: Exception) {
                 // Log error but don't crash app
-                System.err.println("Failed to track event: ${e.message}")
+                logger.error("Failed to track event: ${e.message}", e)
             }
         }
     }

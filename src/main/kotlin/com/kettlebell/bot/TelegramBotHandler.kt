@@ -1088,12 +1088,12 @@ class TelegramBotHandler(
                         InlineKeyboardButton("Послезавтра", "schedule:dayafter"),
                     ),
                     listOf(
-                        InlineKeyboardButton("В понедельник", "schedule:monday"),
+                        InlineKeyboardButton("Через 2 дня", "schedule:in2days"),
                     ),
                 ),
             )
 
-        sendMessage(chatId, "Введите дату и время следующей тренировки (например: 25.01 18:30) или выберите быстрый вариант:", keyboard)
+        sendMessage(chatId, "Когда следующая тренировка?", keyboard)
     }
 
     private suspend fun handleQuickSchedule(
@@ -1102,11 +1102,14 @@ class TelegramBotHandler(
         option: String,
     ) {
         val now = java.time.LocalDateTime.now()
+        // Берем текущее время и смещаем на час назад (для старта тренировки)
+        val targetTime = now.toLocalTime().minusHours(1)
+
         val scheduledTime =
             when (option) {
-                "tomorrow" -> now.plusDays(1).withHour(18).withMinute(0)
-                "dayafter" -> now.plusDays(2).withHour(18).withMinute(0)
-                "monday" -> now.with(java.time.temporal.TemporalAdjusters.next(java.time.DayOfWeek.MONDAY)).withHour(18).withMinute(0)
+                "tomorrow" -> now.plusDays(1).with(targetTime)
+                "dayafter" -> now.plusDays(2).with(targetTime)
+                "in2days" -> now.plusDays(3).with(targetTime)
                 else -> return
             }
 

@@ -91,6 +91,43 @@ class VolumeCalculationTest : StringSpec({
         workoutService.calculateTotalVolume(workout) shouldBe 4800
     }
 
+    "should calculate volume correctly for EMOM with 2 movements (two rows)" {
+        // EMOM 8 min: odd minutes 12 swings, even minutes 6 goblet squats
+        // Each movement: reps per round, sets = minutes/2 = 4 rounds
+        // Финишер EMOM — махи: 16*12*4 = 768
+        // Финишер EMOM — приседы: 16*6*4 = 384
+        val emomSwings = ExercisePerformance("Финишер EMOM — махи", 16, 12, 4, true)
+        val emomSquats = ExercisePerformance("Финишер EMOM — приседы", 16, 6, 4, true)
+        val workout = createWorkoutWithPerformance(listOf(emomSwings, emomSquats))
+
+        workoutService.calculateTotalVolume(workout) shouldBe 768 + 384 // 1152
+    }
+
+    "should calculate volume for full workout with EMOM as two rows (realistic actual_data shape)" {
+        // Данные как при разборе отзыва по плану: махи 12×5, гоблет 10×4, жим 5×4, тяга 8×4, ношение 45с×2, EMOM 8 мин (махи 12×4, приседы 6×4)
+        val actualData =
+            listOf(
+                // 16*12*5 = 960
+                ExercisePerformance("Двуручный мах", 16, 12, 5, true),
+                // 16*10*4 = 640
+                ExercisePerformance("Гоблет‑присед", 16, 10, 4, true),
+                // 16*5*4 = 320
+                ExercisePerformance("Жим вверх одной рукой", 16, 5, 4, true),
+                // 16*8*4 = 512
+                ExercisePerformance("Тяга в наклоне одной рукой", 16, 8, 4, true),
+                // 16*45*2 = 1440 (сек × подходы)
+                ExercisePerformance("Ношение в чемодане", 16, 45, 2, true),
+                // 16*12*4 = 768
+                ExercisePerformance("Финишер EMOM — махи", 16, 12, 4, true),
+                // 16*6*4 = 384
+                ExercisePerformance("Финишер EMOM — приседы", 16, 6, 4, true),
+            )
+        val workout = createWorkoutWithPerformance(actualData)
+        // 5024
+        val expectedVolume = 960 + 640 + 320 + 512 + 1440 + 768 + 384
+        workoutService.calculateTotalVolume(workout) shouldBe expectedVolume
+    }
+
     "should include volume from partial/failed exercises if data is present" {
         val exercises =
             listOf(

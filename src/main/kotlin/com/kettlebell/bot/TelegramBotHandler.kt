@@ -252,7 +252,6 @@ class TelegramBotHandler(
         val userId = user.id
         val parts = command.split(" ", limit = 2)
         val cmd = parts[0].lowercase()
-        // val args = parts.getOrNull(1) ?: ""
 
         analyticsService.track(userId, EventType.COMMAND, cmd)
 
@@ -496,24 +495,31 @@ class TelegramBotHandler(
         chatId: Long,
     ) {
         val workouts = workoutService.getWorkoutHistory(userId, 10)
+        val dateFormatter =
+            java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")
+                .withZone(java.time.ZoneId.systemDefault())
 
         if (workouts.isEmpty()) {
-            sendMessage(chatId, "У тебя пока нет завершенных тренировок.")
+            sendMessage(chatId, "У тебя пока нет тренировок. Запроси план командой /start или через меню.")
         } else {
             val text =
                 buildString {
-                    appendLine("📊 История тренировок:")
+                    appendLine("📊 История тренировок (последние ${workouts.size}):")
                     appendLine()
                     workouts.forEachIndexed { index, workout ->
+                        val statusStr =
+                            when (workout.status) {
+                                com.kettlebell.model.WorkoutStatus.PLANNED -> "Запланирована"
+                                com.kettlebell.model.WorkoutStatus.IN_PROGRESS -> "В процессе"
+                                com.kettlebell.model.WorkoutStatus.COMPLETED -> "Завершена"
+                                com.kettlebell.model.WorkoutStatus.CANCELLED -> "Отменена"
+                            }
+                        val dateStr =
+                            workout.timing.completedAt?.let { dateFormatter.format(it) }
+                                ?: workout.timing.startedAt?.let { dateFormatter.format(it) }
+                                ?: "—"
+                        appendLine("${index + 1}. $dateStr — $statusStr")
                         if (workout.status == com.kettlebell.model.WorkoutStatus.COMPLETED) {
-                            val dateStr =
-                                workout.timing.completedAt?.let {
-                                    java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")
-                                        .withZone(java.time.ZoneId.systemDefault())
-                                        .format(it)
-                                } ?: "Дата неизвестна"
-
-                            appendLine("${index + 1}. $dateStr")
                             workout.actualPerformance?.let { perf ->
                                 val volume = workoutService.calculateTotalVolume(workout)
                                 appendLine("   Объем: $volume кг")
@@ -521,8 +527,8 @@ class TelegramBotHandler(
                                     appendLine("   RPE: ${perf.rpe}")
                                 }
                             }
-                            appendLine()
                         }
+                        appendLine()
                     }
                 }
             sendMessage(chatId, text)
@@ -770,12 +776,11 @@ class TelegramBotHandler(
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun handleOnboardingGoals(
         userId: Long,
         text: String,
     ): String {
-        // This should not be called anymore as we use callback buttons
-        // But keep for backward compatibility
         return "Пожалуйста, выбери цель из предложенных вариантов."
     }
 
@@ -912,12 +917,11 @@ class TelegramBotHandler(
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun handleEditGoal(
         userId: Long,
         text: String,
     ): String {
-        // This should not be called anymore as we use callback buttons
-        // But keep for backward compatibility
         return "Пожалуйста, выбери цель из предложенных вариантов."
     }
 

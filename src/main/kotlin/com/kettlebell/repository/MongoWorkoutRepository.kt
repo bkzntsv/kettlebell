@@ -39,7 +39,8 @@ class MongoWorkoutRepository(
         limit: Int,
     ): List<Workout> {
         return collection.find(Workout::userId eq userId)
-            .sort(descending(Workout::timing))
+            .sort(descending(Workout::timing / WorkoutTiming::completedAt))
+            .sort(descending(Workout::timing / WorkoutTiming::startedAt))
             .limit(limit)
             .toList()
     }
@@ -49,7 +50,8 @@ class MongoWorkoutRepository(
         count: Int,
     ): List<Workout> {
         return collection.find(Workout::userId eq userId)
-            .sort(descending(Workout::timing))
+            .sort(descending(Workout::timing / WorkoutTiming::completedAt))
+            .sort(descending(Workout::timing / WorkoutTiming::startedAt))
             .limit(count)
             .toList()
     }
